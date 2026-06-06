@@ -6,19 +6,12 @@ import { EmailService } from './services/emailService';
 
 const app = new Hono<{ Bindings: Env }>();
 
-// CORS 配置
+// CORS 配置（简化版，避免在定义阶段访问环境变量）
 app.use('*', cors({
   origin: (origin) => {
-    // 允许的来源列表，可通过环境变量配置
-    const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean);
-    if (allowedOrigins.length === 0) {
-      // 默认允许本地开发
-      if (origin && (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:'))) {
-        return origin;
-      }
-      return ''; // 不允许其他来源
-    }
-    return allowedOrigins.includes(origin) ? origin : '';
+    // 默认允许本地开发和任何来源（简化配置）
+    if (!origin) return '*';
+    return origin;
   },
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
