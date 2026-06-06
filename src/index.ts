@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import type { Env } from '../types';
 import api from './routes/api';
 import { EmailService } from './services/emailService';
+import { initDatabase } from './db/init';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -25,8 +26,13 @@ app.use('*', cors({
 }));
 
 // 健康检查
-app.get('/health', (c) => {
-  return c.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/health', async (c) => {
+  try {
+    await initDatabase(c.env);
+    return c.json({ status: 'ok', timestamp: new Date().toISOString(), database: 'initialized' });
+  } catch (error) {
+    return c.json({ status: 'error', timestamp: new Date().toISOString(), error: (error as Error).message }, 500);
+  }
 });
 
 // API 路由
