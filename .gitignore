@@ -1,0 +1,33 @@
+# Dependencies
+node_modules
+
+# Build outputs
+dist
+*.tsbuildinfo
+
+# Environment files (may contain secrets)
+.dev.vars
+.env
+.env.local
+.env.*.local
+
+# Wrangler
+.wrangler
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage
+
+# Logs
+*.log
+npm-debug.log*
