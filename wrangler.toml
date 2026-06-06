@@ -2,7 +2,7 @@
 # Worker Mailer - 邮件发送服务
 # ============================================
 
-name = "worker-mailer"
+name = "cf-worker-mailer"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
