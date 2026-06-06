@@ -6,6 +6,12 @@ import { EmailService } from './services/emailService';
 
 const app = new Hono<{ Bindings: Env }>();
 
+// 全局错误处理
+app.onError((err, c) => {
+  console.error('Error:', err);
+  return c.json({ error: 'Internal Server Error', details: err.message }, 500);
+});
+
 // CORS 配置（简化版，避免在定义阶段访问环境变量）
 app.use('*', cors({
   origin: (origin) => {
