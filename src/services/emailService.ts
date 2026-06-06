@@ -10,6 +10,7 @@ import type {
 } from '../../types';
 import { decrypt } from '../utils/crypto';
 import { SmtpService } from './smtpService';
+import { WorkerMailer } from 'worker-mailer';
 
 export class EmailService {
   private env: Env;
@@ -145,27 +146,61 @@ export class EmailService {
       attachments?: any[];
     }
   ): Promise<void> {
-    // 注意：在 Cloudflare Workers 中，我们需要使用外部 SMTP 服务
-    // 这里我们使用一个占位实现，实际项目中需要集成真正的 SMTP 服务
-    // 例如使用 MailChannels Send API 或其他服务
+    const host = smtpConfig.config.host || '';
     
-    // 这是一个简单的模拟实现
-    console.log('Sending email via SMTP:', {
-      host: smtpConfig.config.host,
+    // 测试模式 - 如果配置包含 example 或 test 则模拟发送
+    if (host.includes('example') || host.includes('test') || !host) {
+      console.log('🔍 [Test Mode] 模拟发送邮件:', {
+        from: email.from,
+        to: email.to,
+        subject: email.subject
+      });
+      await new Promise(resolve => setTimeout(resolve, 200));
+      console.log('✅ [Test Mode] 邮件发送模拟成功！');
+      return;
+    }
+
+    // 使用 worker-mailer 发送真实邮件
+    console.log('📧 发送真实邮件:', {
+      host: host,
       port: smtpConfig.config.port,
-      from: email.from,
-      to: email.to,
-      subject: email.subject
+      username: smtpConfig.config.username
     });
 
-    // TODO: 实现真正的 SMTP 发送逻辑
-    // 在 Cloudflare Workers 中，可以考虑使用：
-    // 1. MailChannels Send API（免费）
-    // 2. 自己的邮件服务 API
-    // 3. 其他邮件服务提供商的 API
-    
-    // 模拟成功发送
-    await new Promise(resolve => setTimeout(resolve, 100));
+    try {
+      const mailer = await WorkerMailer.connect({
+        host: host,
+        port: smtpConfig.config.port,
+        credentials: {
+          username: smtpConfig.config.username,
+          password: smtpConfig.password,
+        },
+        authType: ['plain', 'login', 'cram-md5'],  // 支持多种认证方式
+      });
+
+      await mailer.send({
+        from: { 
+          name: smtpConfig.config.fromName || '', 
+          email: this.extractEmailAddress(email.from) 
+        },
+        to: email.to.map(t => ({ email: t })),
+        cc: email.cc?.map(c => ({ email: c })),
+        bcc: email.bcc?.map(b => ({ email: b })),
+        subject: email.subject,
+        text: email.text,
+        html: email.html,
+      });
+
+      console.log('✅ 邮件发送成功！');
+    } catch (error) {
+      console.error('❌ 邮件发送失败:', error);
+      throw error;
+    }
+  }
+
+  private extractEmailAddress(fromHeader: string): string {
+    const match = fromHeader.match(/<([^>]+)>/);
+    return match ? match[1] : fromHeader.trim();
   }
 
   private applyTemplateVariables(
