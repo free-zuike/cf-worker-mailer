@@ -168,9 +168,23 @@ export class EmailService {
     });
 
     try {
+      // 根据端口自动设置 TLS/STARTTLS 配置
+      const isOutlook = host.includes('outlook') || host.includes('office365');
+      const port = smtpConfig.config.port;
+      let secure = port === 465; // 465端口通常使用隐式TLS
+      let startTls = port === 587; // 587端口通常使用STARTTLS
+      
+      // Outlook 特定配置
+      if (isOutlook && port === 587) {
+        startTls = true;
+        secure = false;
+      }
+
       const mailer = await WorkerMailer.connect({
         host: host,
-        port: smtpConfig.config.port,
+        port: port,
+        secure: secure,
+        requireTLS: startTls,
         credentials: {
           username: smtpConfig.config.username,
           password: smtpConfig.password,
@@ -194,6 +208,22 @@ export class EmailService {
       console.log('✅ 邮件发送成功！');
     } catch (error) {
       console.error('❌ 邮件发送失败:', error);
+      
+      // 为 Outlook 提供额外的错误指导
+      const isOutlook = host.includes('outlook') || host.includes('office365');
+      if (isOutlook) {
+        const errorMsg = (error as Error).message;
+        if (errorMsg.includes('535') || errorMsg.includes('Authentication')) {
+          throw new Error(
+            'Outlook 认证失败！请检查：\n' +
+            '1. 确保使用正确的邮箱地址和应用密码（不是普通密码）\n' +
+            '2. 如果启用了双因素验证，需要创建应用密码\n' +
+            '3. 创建应用密码步骤：微软账户 -> 安全 -> 高级安全选项 -> 应用密码\n\n' +
+            '原始错误: ' + errorMsg
+          );
+        }
+      }
+      
       throw error;
     }
   }
