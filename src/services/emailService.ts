@@ -10,6 +10,7 @@ import type {
 } from '../../types';
 import { decrypt } from '../utils/crypto';
 import { SmtpService } from './smtpService';
+import { WorkerMailer } from 'worker-mailer';
 
 export class EmailService {
   private env: Env;
@@ -75,23 +76,10 @@ export class EmailService {
         html || null,
         text || null,
         request.attachments ? JSON.stringify(request.attachments) : null,
-        request.async ? 'pending' : 'pending',
+        'pending',
         now
       )
       .run();
-
-    if (request.async) {
-      await this.env.MAIL_QUEUE.send({
-        emailId: id,
-        userId: this.userId
-      });
-
-      return {
-        id,
-        status: 'pending',
-        createdAt: now
-      };
-    }
 
     await this.processEmail(id);
     const history = await this.getHistory(id);
@@ -114,16 +102,29 @@ export class EmailService {
         throw new Error('SMTP configuration not found');
       }
 
-      await this.sendViaSMTP(fullConfig, {
-        from: history.fromEmail,
-        to: history.toEmails,
-        cc: history.ccEmails,
-        bcc: history.bccEmails,
-        subject: history.subject,
-        html: history.htmlContent,
-        text: history.textContent,
-        attachments: history.attachments
-      });
+      if (fullConfig.config.type === 'mailchannels') {
+        await this.sendViaMailChannels(fullConfig.config, {
+          from: history.fromEmail,
+          to: history.toEmails,
+          cc: history.ccEmails,
+          bcc: history.bccEmails,
+          subject: history.subject,
+          html: history.htmlContent,
+          text: history.textContent,
+          attachments: history.attachments
+        });
+      } else {
+        await this.sendViaSMTP(fullConfig, {
+          from: history.fromEmail,
+          to: history.toEmails,
+          cc: history.ccEmails,
+          bcc: history.bccEmails,
+          subject: history.subject,
+          html: history.htmlContent,
+          text: history.textContent,
+          attachments: history.attachments
+        });
+      }
 
       await this.updateHistoryStatus(emailId, 'sent');
     } catch (error) {
@@ -145,27 +146,79 @@ export class EmailService {
       attachments?: any[];
     }
   ): Promise<void> {
-    // 注意：在 Cloudflare Workers 中，我们需要使用外部 SMTP 服务
-    // 这里我们使用一个占位实现，实际项目中需要集成真正的 SMTP 服务
-    // 例如使用 MailChannels Send API 或其他服务
-    
-    // 这是一个简单的模拟实现
-    console.log('Sending email via SMTP:', {
-      host: smtpConfig.config.host,
-      port: smtpConfig.config.port,
-      from: email.from,
-      to: email.to,
-      subject: email.subject
+    const config = smtpConfig.config;
+    const port = config.port || 587;
+    const secure = port === 465;
+    const startTls = port !== 465;
+
+    const mailer = new WorkerMailer({
+      host: config.host,
+      port: port,
+      secure: secure,
+      auth: {
+        user: config.username,
+        pass: smtpConfig.password
+      },
+      tls: {
+        rejectUnauthorized: false
+      }
     });
 
-    // TODO: 实现真正的 SMTP 发送逻辑
-    // 在 Cloudflare Workers 中，可以考虑使用：
-    // 1. MailChannels Send API（免费）
-    // 2. 自己的邮件服务 API
-    // 3. 其他邮件服务提供商的 API
-    
-    // 模拟成功发送
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await mailer.sendMail({
+      from: email.from,
+      to: email.to,
+      cc: email.cc,
+      bcc: email.bcc,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
+      attachments: email.attachments
+    });
+  }
+
+  private async sendViaMailChannels(
+    config: any,
+    email: {
+      from: string;
+      to: string[];
+      cc?: string[];
+      bcc?: string[];
+      subject: string;
+      html?: string;
+      text?: string;
+      attachments?: any[];
+    }
+  ): Promise<void> {
+    const personalizations = [
+      {
+        to: email.to.map(email => ({ email })),
+        ...(email.cc ? { cc: email.cc.map(email => ({ email })) } : {}),
+        ...(email.bcc ? { bcc: email.bcc.map(email => ({ email })) } : {}),
+        subject: email.subject
+      }
+    ];
+
+    const response = await fetch('https://api.mailchannels.net/tx/v1/send', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        personalizations,
+        from: { email: config.fromEmail, name: config.fromName || '' },
+        subject: email.subject,
+        content: [
+          ...(email.text ? [{ type: 'text/plain', value: email.text }] : []),
+          ...(email.html ? [{ type: 'text/html', value: email.html }] : [])
+        ],
+        ...(email.attachments ? { attachments: email.attachments } : {})
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`MailChannels send failed: ${response.status} ${errorText}`);
+    }
   }
 
   private applyTemplateVariables(
