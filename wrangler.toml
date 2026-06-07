@@ -2,7 +2,7 @@
 # Worker Mailer - 邮件发送服务
 # ============================================
 
-name = "worker-mailer"
+name = "cf-worker-mailer"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
@@ -22,20 +22,8 @@ run_worker_first = true
 [[d1_databases]]
 binding = "DB"
 database_name = "worker-mailer-db"
-database_id = "${D1_DATABASE_ID}"
+database_id = "617b03d0-c1f4-466f-a1b5-ed68260ff0f4"
 migrations_dir = "migrations"
-
-# ------------------------------------------
-# Queues 队列（异步任务处理）
-# ------------------------------------------
-[[queues.producers]]
-queue = "worker-mailer-queue"
-binding = "MAIL_QUEUE"
-
-[[queues.consumers]]
-queue = "worker-mailer-queue"
-max_batch_size = 10
-max_retries = 3
 
 # ------------------------------------------
 # 环境变量配置
