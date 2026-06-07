@@ -3,38 +3,46 @@ import { cors } from 'hono/cors';
 import type { Env } from '../types';
 import api from './routes/api';
 import { EmailService } from './services/emailService';
+import { initDatabase } from './db/init';
 
 const app = new Hono<{ Bindings: Env }>();
 
-// CORS 配置
+// CORS 配置（简化版）
 app.use('*', cors({
   origin: (origin) => {
-    // 允许的来源列表，可通过环境变量配置
-    const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean);
-    if (allowedOrigins.length === 0) {
-      // 默认允许本地开发
-      if (origin && (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:'))) {
-        return origin;
-      }
-      return ''; // 不允许其他来源
-    }
-    return allowedOrigins.includes(origin) ? origin : '';
+    // 默认允许任何来源（简化配置）
+    return origin || '*';
   },
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
   credentials: true
 }));
 
-// 健康检查
-app.get('/health', (c) => {
-  return c.json({ status: 'ok', timestamp: new Date().toISOString() });
+// 健康检查（初始化数据库）
+app.get('/health', async (c) => {
+  try {
+    await initDatabase(c.env);
+    return c.json({ status: 'ok', database: 'initialized', timestamp: new Date().toISOString() });
+  } catch (error) {
+    return c.json({ status: 'error', error: (error as Error).message, timestamp: new Date().toISOString() }, 500);
+  }
 });
 
 // API 路由
 app.route('/api', api);
 
-// 静态资源（前端）
+// 静态资源（前端）- 访问首页时自动初始化数据库
 app.get('*', async (c) => {
+  try {
+    // 访问首页时自动初始化数据库
+    const url = new URL(c.req.url);
+    if (url.pathname === '/' || url.pathname === '/index.html') {
+      await initDatabase(c.env);
+    }
+  } catch (error) {
+    console.error('Database initialization failed:', error);
+    // 即使数据库初始化失败，也继续返回页面
+  }
   return c.env.ASSETS.fetch(c.req.raw);
 });
 
