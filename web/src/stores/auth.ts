@@ -14,6 +14,19 @@ interface Token {
   expiresAt: number;
 }
 
+// 防止同时多个刷新请求
+let isRefreshing = false;
+let refreshSubscribers: ((token: Token) => void)[] = [];
+
+function onTokenRefreshed(token: Token) {
+  refreshSubscribers.forEach(callback => callback(token));
+  refreshSubscribers = [];
+}
+
+function addRefreshSubscriber(callback: (token: Token) => void) {
+  refreshSubscribers.push(callback);
+}
+
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null);
   const token = ref<Token | null>(null);
@@ -21,6 +34,14 @@ export const useAuthStore = defineStore('auth', () => {
   const error = ref<string | null>(null);
 
   const isAuthenticated = computed(() => !!user.value && !!token.value);
+
+  // 检查 token 是否即将过期（5分钟内）
+  function isTokenExpiring(): boolean {
+    if (!token.value) return true;
+    const now = Date.now();
+    const fiveMinutes = 5 * 60 * 1000;
+    return token.value.expiresAt - now < fiveMinutes;
+  }
 
   // 从 localStorage 恢复会话
   function restoreSession() {
@@ -52,6 +73,39 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('token');
     user.value = null;
     token.value = null;
+  }
+
+  // 刷新 token
+  async function refreshToken(): Promise<Token | null> {
+    if (!token.value?.refreshToken) {
+      logout();
+      return null;
+    }
+
+    if (isRefreshing) {
+      return new Promise((resolve) => {
+        addRefreshSubscriber((newToken) => {
+          resolve(newToken);
+        });
+      });
+    }
+
+    isRefreshing = true;
+
+    try {
+      const response = await api.post('/auth/refresh', { refreshToken: token.value.refreshToken });
+      user.value = response.user;
+      token.value = response.token;
+      saveSession();
+      onTokenRefreshed(response.token);
+      return response.token;
+    } catch (e) {
+      console.error('Failed to refresh token:', e);
+      logout();
+      throw e;
+    } finally {
+      isRefreshing = false;
+    }
   }
 
   // 登录
@@ -106,6 +160,8 @@ export const useAuthStore = defineStore('auth', () => {
     loading,
     error,
     isAuthenticated,
+    isTokenExpiring,
+    refreshToken,
     login,
     register,
     logout
