@@ -2,31 +2,37 @@
   <Layout>
     <div class="smtp-page">
       <div class="page-header">
-        <h2>SMTP 配置</h2>
+        <h2>邮件配置</h2>
         <button @click="showModal = true" class="btn-primary">添加配置</button>
       </div>
       
       <div v-if="configs.length === 0" class="empty-state">
         <div class="empty-icon">⚙️</div>
-        <p>还没有配置 SMTP 服务器</p>
-        <p class="empty-desc">添加你的邮件服务器配置开始发送邮件</p>
+        <p>还没有配置邮件服务器</p>
+        <p class="empty-desc">添加你的邮件配置开始发送邮件</p>
+        <p class="empty-tip">推荐使用 <strong>MailChannels</strong> - 免费且无需配置 SMTP</p>
       </div>
       
       <div v-else class="configs-grid">
         <div v-for="config in configs" :key="config.id" class="config-card">
           <div class="config-header">
             <div class="config-name">{{ config.name }}</div>
+            <div class="config-type" :class="config.type">{{ config.type === 'mailchannels' ? 'MailChannels' : 'SMTP' }}</div>
             <div class="config-status" :class="config.enabled ? 'active' : 'inactive'">
               {{ config.enabled ? '启用' : '禁用' }}
             </div>
           </div>
           
           <div class="config-details">
-            <div class="detail-row">
+            <div v-if="config.type === 'mailchannels'" class="detail-row">
+              <span class="detail-label">服务:</span>
+              <span class="detail-value">MailChannels (免费)</span>
+            </div>
+            <div v-else class="detail-row">
               <span class="detail-label">服务器:</span>
               <span class="detail-value">{{ config.host }}:{{ config.port }}</span>
             </div>
-            <div class="detail-row">
+            <div v-if="config.type === 'smtp'" class="detail-row">
               <span class="detail-label">用户名:</span>
               <span class="detail-value">{{ config.username }}</span>
             </div>
@@ -34,7 +40,7 @@
               <span class="detail-label">发件人:</span>
               <span class="detail-value">{{ config.fromName || '' }} &lt;{{ config.fromEmail }}&gt;</span>
             </div>
-            <div class="detail-row">
+            <div v-if="config.type === 'smtp'" class="detail-row">
               <span class="detail-label">安全:</span>
               <span class="detail-value">{{ config.secure ? 'TLS' : '无' }}</span>
             </div>
@@ -56,29 +62,42 @@
           
           <form @submit.prevent="handleSubmit" class="modal-form">
             <div class="form-group">
+              <label>配置类型</label>
+              <select v-model="formData.type" @change="onTypeChange" class="form-select">
+                <option value="mailchannels">MailChannels (推荐 - 免费)</option>
+                <option value="smtp">SMTP 服务器</option>
+              </select>
+            </div>
+
+            <div class="form-group">
               <label>配置名称</label>
-              <input v-model="formData.name" type="text" required placeholder="我的 SMTP 服务器" />
+              <input v-model="formData.name" type="text" required placeholder="我的邮件服务" />
+            </div>
+
+            <div v-if="formData.type === 'mailchannels'" class="mailchannels-notice">
+              <p>📧 MailChannels 是 Cloudflare 提供的免费邮件发送服务</p>
+              <p>无需配置服务器地址和密码，只需设置发件人邮箱即可</p>
             </div>
             
-            <div class="form-row">
+            <div v-if="formData.type === 'smtp'" class="form-row">
               <div class="form-group">
                 <label>服务器地址</label>
-                <input v-model="formData.host" type="text" required placeholder="smtp.example.com" />
+                <input v-model="formData.host" type="text" :required="formData.type === 'smtp'" placeholder="smtp.example.com" />
               </div>
               <div class="form-group">
                 <label>端口</label>
-                <input v-model.number="formData.port" type="number" required :min="1" :max="65535" />
+                <input v-model.number="formData.port" type="number" :required="formData.type === 'smtp'" :min="1" :max="65535" />
               </div>
             </div>
             
-            <div class="form-row">
+            <div v-if="formData.type === 'smtp'" class="form-row">
               <div class="form-group">
                 <label>用户名</label>
-                <input v-model="formData.username" type="text" required placeholder="user@example.com" />
+                <input v-model="formData.username" type="text" :required="formData.type === 'smtp'" placeholder="user@example.com" />
               </div>
               <div class="form-group">
                 <label>密码</label>
-                <input v-model="formData.password" type="password" :required="!editingConfig" placeholder="••••••••" />
+                <input v-model="formData.password" type="password" :required="formData.type === 'smtp' && !editingConfig" placeholder="••••••••" />
               </div>
             </div>
             
@@ -94,7 +113,7 @@
             </div>
             
             <div class="form-group checkbox-group">
-              <label>
+              <label v-if="formData.type === 'smtp'">
                 <input type="checkbox" v-model="formData.secure" /> 启用 TLS/SSL
               </label>
               <label>
@@ -123,9 +142,10 @@ import { api } from '../api';
 interface SmtpConfig {
   id: string;
   name: string;
-  host: string;
-  port: number;
-  username: string;
+  type: 'smtp' | 'mailchannels';
+  host?: string;
+  port?: number;
+  username?: string;
   fromEmail: string;
   fromName?: string;
   secure: boolean;
@@ -139,6 +159,7 @@ const saving = ref(false);
 
 const formData = ref({
   name: '',
+  type: 'mailchannels' as const,
   host: '',
   port: 587,
   username: '',
@@ -158,13 +179,27 @@ async function loadConfigs() {
   }
 }
 
+function onTypeChange() {
+  if (formData.value.type === 'mailchannels') {
+    formData.value.host = '';
+    formData.value.port = 587;
+    formData.value.username = '';
+    formData.value.password = '';
+    formData.value.secure = true;
+  } else {
+    formData.value.host = 'smtp.example.com';
+    formData.value.port = 587;
+  }
+}
+
 function editConfig(config: SmtpConfig) {
   editingConfig.value = config;
   formData.value = {
     name: config.name,
-    host: config.host,
-    port: config.port,
-    username: config.username,
+    type: config.type || 'smtp',
+    host: config.host || '',
+    port: config.port || 587,
+    username: config.username || '',
     password: '',
     fromEmail: config.fromEmail,
     fromName: config.fromName || '',
@@ -209,6 +244,7 @@ function resetForm() {
   editingConfig.value = null;
   formData.value = {
     name: '',
+    type: 'mailchannels',
     host: '',
     port: 587,
     username: '',
@@ -240,6 +276,7 @@ onMounted(() => {
 .page-header h2 {
   font-size: 28px;
   color: #1e3a5f;
+  margin: 0;
 }
 
 .btn-primary {
@@ -320,6 +357,12 @@ onMounted(() => {
   font-size: 14px !important;
 }
 
+.empty-tip {
+  color: #667eea !important;
+  font-size: 14px !important;
+  margin-top: 16px;
+}
+
 .configs-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
@@ -338,12 +381,31 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
+  gap: 12px;
 }
 
 .config-name {
   font-size: 18px;
   font-weight: 600;
   color: #1e3a5f;
+}
+
+.config-type {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.config-type.mailchannels {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.config-type.smtp {
+  background: #e3f2fd;
+  color: #1565c0;
 }
 
 .config-status {
@@ -376,6 +438,7 @@ onMounted(() => {
 .detail-label {
   color: #888;
   width: 80px;
+  flex-shrink: 0;
 }
 
 .detail-value {
@@ -445,18 +508,43 @@ onMounted(() => {
   font-size: 14px;
 }
 
-.form-group input {
+.form-group input,
+.form-group .form-select {
   width: 100%;
   padding: 12px;
   border: 2px solid #e1e5eb;
   border-radius: 8px;
   font-size: 15px;
   transition: border-color 0.2s;
+  background: white;
 }
 
-.form-group input:focus {
+.form-group input:focus,
+.form-group .form-select:focus {
   outline: none;
   border-color: #667eea;
+}
+
+.form-group .form-select {
+  cursor: pointer;
+}
+
+.mailchannels-notice {
+  background: #e8f5e9;
+  border: 1px solid #a5d6a7;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.mailchannels-notice p {
+  margin: 0 0 8px 0;
+  color: #2e7d32;
+  font-size: 14px;
+}
+
+.mailchannels-notice p:last-child {
+  margin-bottom: 0;
 }
 
 .form-row {
