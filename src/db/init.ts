@@ -23,6 +23,9 @@ export async function initDatabase(env: Env) {
           refresh_token TEXT,
           refresh_token_expires_at INTEGER,
           role TEXT DEFAULT 'user',
+          github_id TEXT,
+          name TEXT,
+          avatar_url TEXT,
           disabled INTEGER DEFAULT 0,
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL
@@ -86,6 +89,20 @@ export async function initDatabase(env: Env) {
         )
       `).run();
 
+      // Create oauth_states table
+      await env.DB.prepare(`
+        CREATE TABLE oauth_states (
+          id TEXT PRIMARY KEY,
+          state TEXT NOT NULL UNIQUE,
+          user_id TEXT,
+          redirect_uri TEXT,
+          provider TEXT NOT NULL,
+          code_verifier TEXT,
+          expires_at INTEGER NOT NULL,
+          created_at TEXT NOT NULL
+        )
+      `).run();
+
       // Create system_settings table (全局系统设置 - 管理员维护）
       await env.DB.prepare(`
         CREATE TABLE system_settings (
@@ -131,6 +148,50 @@ export async function initDatabase(env: Env) {
         await env.DB.prepare(
           "ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'"
         ).run();
+      }
+
+      const hasGithubId = userColumns.results.some(col => col.name === 'github_id');
+      if (!hasGithubId) {
+        console.log('Adding github_id column to users...');
+        await env.DB.prepare(
+          "ALTER TABLE users ADD COLUMN github_id TEXT"
+        ).run();
+      }
+
+      const hasName = userColumns.results.some(col => col.name === 'name');
+      if (!hasName) {
+        console.log('Adding name column to users...');
+        await env.DB.prepare(
+          "ALTER TABLE users ADD COLUMN name TEXT"
+        ).run();
+      }
+
+      const hasAvatarUrl = userColumns.results.some(col => col.name === 'avatar_url');
+      if (!hasAvatarUrl) {
+        console.log('Adding avatar_url column to users...');
+        await env.DB.prepare(
+          "ALTER TABLE users ADD COLUMN avatar_url TEXT"
+        ).run();
+      }
+
+      // Check for oauth_states table
+      const oauthStatesTable = await env.DB.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='oauth_states'"
+      ).first();
+      if (!oauthStatesTable) {
+        console.log('Creating oauth_states table...');
+        await env.DB.prepare(`
+          CREATE TABLE oauth_states (
+            id TEXT PRIMARY KEY,
+            state TEXT NOT NULL UNIQUE,
+            user_id TEXT,
+            redirect_uri TEXT,
+            provider TEXT NOT NULL,
+            code_verifier TEXT,
+            expires_at INTEGER NOT NULL,
+            created_at TEXT NOT NULL
+          )
+        `).run();
       }
 
       // Check for system_settings table

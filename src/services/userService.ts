@@ -236,4 +236,70 @@ export class UserService {
 
     return this.findById(id) as Promise<User>;
   }
+
+  // 通过 GitHub ID 查找用户
+  async findByGithubId(githubId: string): Promise<User | null> {
+    const row = await this.env.DB.prepare(
+      'SELECT id, email, role, disabled, created_at, updated_at FROM users WHERE github_id = ?'
+    ).bind(githubId).first<{
+      id: string;
+      email: string;
+      role: string;
+      disabled: number;
+      created_at: string;
+      updated_at: string;
+    }>();
+
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      email: row.email,
+      role: row.role as 'user' | 'admin',
+      disabled: !!row.disabled,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  }
+
+  // 使用 GitHub 注册用户
+  async registerWithGithub(
+    email: string,
+    password: string,
+    githubId: string,
+    name?: string,
+    avatarUrl?: string
+  ): Promise<User> {
+    const existing = await this.findByEmail(email);
+    if (existing) {
+      throw new Error('User already exists');
+    }
+
+    const id = crypto.randomUUID();
+    const hashedPassword = await hashPassword(password);
+    const now = new Date().toISOString();
+    const isAdmin = email === this.env.ADMIN_EMAIL;
+
+    await this.env.DB.prepare(
+      'INSERT INTO users (id, email, password, role, github_id, name, avatar_url, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    )
+      .bind(id, email, hashedPassword, isAdmin ? 'admin' : 'user', githubId, name || null, avatarUrl || null, now, now)
+      .run();
+
+    return this.findById(id) as Promise<User>;
+  }
+
+  // 关联 GitHub 账户到现有用户
+  async linkGithub(userId: string, githubId: string, avatarUrl?: string): Promise<void> {
+    const now = new Date().toISOString();
+    if (avatarUrl) {
+      await this.env.DB.prepare(
+        'UPDATE users SET github_id = ?, avatar_url = ?, updated_at = ? WHERE id = ?'
+      ).bind(githubId, avatarUrl, now, userId).run();
+    } else {
+      await this.env.DB.prepare(
+        'UPDATE users SET github_id = ?, updated_at = ? WHERE id = ?'
+      ).bind(githubId, now, userId).run();
+    }
+  }
 }

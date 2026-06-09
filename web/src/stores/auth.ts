@@ -94,7 +94,7 @@ export const useAuthStore = defineStore('auth', () => {
     isRefreshing = true;
 
     try {
-      const response = await api.post('/auth/refresh', { refreshToken: token.value.refreshToken });
+      const response = await api.post<{ user: User; token: Token }>('/auth/refresh', { refreshToken: token.value.refreshToken });
       user.value = response.user;
       token.value = response.token;
       saveSession();
@@ -115,7 +115,7 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null;
 
     try {
-      const response = await api.post('/auth/login', { email, password, captchaToken });
+      const response = await api.post<{ user: User; token: Token }>('/auth/login', { email, password, captchaToken });
       user.value = response.user;
       token.value = response.token;
       saveSession();
@@ -134,7 +134,7 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null;
 
     try {
-      const response = await api.post('/auth/register', { email, password, captchaToken });
+      const response = await api.post<{ user: User; token: Token }>('/auth/register', { email, password, captchaToken });
       user.value = response.user;
       token.value = response.token;
       saveSession();
@@ -159,7 +159,7 @@ export const useAuthStore = defineStore('auth', () => {
   // 获取用户信息（用于 OAuth 登录后）
   async function fetchUser() {
     try {
-      const response = await api.get('/auth/me');
+      const response = await api.get<{ user: User }>('/auth/me');
       user.value = response.user;
       saveSession();
     } catch (e) {

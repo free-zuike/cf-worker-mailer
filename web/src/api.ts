@@ -37,7 +37,7 @@ async function request<T>(
     'Content-Type': 'application/json'
   };
 
-  if (store.token) {
+  if (store.token?.token) {
     headers['Authorization'] = `Bearer ${store.token.token}`;
   }
 

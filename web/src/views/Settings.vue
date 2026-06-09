@@ -5,6 +5,57 @@
         <h2>系统设置</h2>
       </div>
 
+      <!-- ==================== GitHub OAuth 设置 ==================== -->
+      <div class="settings-card">
+        <div class="card-header">
+          <h3>GitHub 登录</h3>
+          <label class="toggle">
+            <input type="checkbox" v-model="github.enabled" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="card-body">
+          <p class="help-text">
+            启用后，用户可以使用 GitHub 账号登录。
+            请先在 GitHub 创建 OAuth App，然后在下方填入配置。
+          </p>
+          
+          <div class="form-group">
+            <label>GitHub OAuth App 客户端 ID</label>
+            <input v-model="github.clientId" type="text" class="form-input" placeholder="Iv1.xxxxxxxx" />
+          </div>
+          
+          <div class="form-group">
+            <label>GitHub OAuth App 客户端密钥</label>
+            <input v-model="github.clientSecret" type="password" class="form-input" placeholder="留空则保持不变" />
+          </div>
+
+          <div class="github-help">
+            <h4>如何创建 GitHub OAuth App:</h4>
+            <ol>
+              <li>登录 GitHub 后进入 Settings - Developer settings - OAuth Apps</li>
+              <li>点击 "New OAuth App"</li>
+              <li>填写:
+                <ul>
+                  <li>Application name: Worker Mailer</li>
+                  <li>Homepage URL: {{ homepageUrl }}</li>
+                  <li>Authorization callback URL: {{ callbackUrl }}</li>
+                </ul>
+              </li>
+              <li>点击 "Register application"</li>
+              <li>复制生成的 Client ID 和 Client Secret 到上方输入框</li>
+            </ol>
+          </div>
+          
+          <div class="card-actions">
+            <button @click="saveGithub" :disabled="savingGithub" class="btn-primary">
+              {{ savingGithub ? '保存中...' : '保存 GitHub 登录' }}
+            </button>
+            <span v-if="githubMsg" class="msg" :class="githubMsgType">{{ githubMsg }}</span>
+          </div>
+        </div>
+      </div>
+
       <!-- ==================== 人机验证设置 ==================== -->
       <div class="settings-card">
         <div class="card-header">
@@ -24,8 +75,7 @@
             <input v-model="captcha.secretKey" type="password" class="form-input" placeholder="留空则保持不变" />
           </div>
           <p class="help-text">
-            在 <a href="https://dash.cloudflare.com" target="_blank" rel="noopener">Cloudflare</a>
-            创建站点后填入密钥，登录和注册页面会启用人机验证。
+            在 Cloudflare Dashboard 创建站点后填入密钥，登录和注册页面会启用人机验证。
           </p>
           <div class="card-actions">
             <button @click="saveCaptcha" :disabled="savingCaptcha" class="btn-primary">
@@ -35,87 +85,14 @@
           </div>
         </div>
       </div>
-
-      <!-- ==================== OpenAuth 设置 ==================== -->
-      <div class="settings-card">
-        <div class="card-header">
-          <h3>第三方登录 (OpenAuth)</h3>
-          <label class="toggle">
-            <input type="checkbox" v-model="oauth.enabled" />
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        <div class="card-body">
-          <div
-            v-for="(provider, index) in oauth.providers"
-            :key="provider.name"
-            class="provider-section"
-          >
-            <div class="provider-header">
-              <span class="provider-name">{{ provider.label }}</span>
-              <label class="toggle small">
-                <input type="checkbox" v-model="provider.enabled" />
-                <span class="toggle-slider"></span>
-              </label>
-            </div>
-
-            <div class="form-group">
-              <label>显示名称</label>
-              <input v-model="provider.label" type="text" class="form-input" placeholder="My OpenAuth" />
-            </div>
-
-            <div class="form-group">
-              <label>Issuer URL</label>
-              <input v-model="provider.issuer" type="text" class="form-input" placeholder="https://your-oidc-provider.com" />
-            </div>
-
-            <div class="form-group">
-              <label>客户端 ID (Client ID)</label>
-              <input v-model="provider.clientId" type="text" class="form-input" placeholder="your-client-id" />
-            </div>
-
-            <div class="form-group">
-              <label>客户端密钥 (Client Secret)</label>
-              <input v-model="provider.clientSecret" type="password" class="form-input" placeholder="留空则保持不变" />
-            </div>
-
-            <div class="form-group">
-              <label>作用域 (Scopes，空格分隔)</label>
-              <input v-model="oauthScopes[index]" type="text" class="form-input" placeholder="openid email profile" />
-            </div>
-
-            <div class="callback-info">
-              <strong>回调地址：</strong>
-              <code>{{ callbackUrl }}</code>
-            </div>
-          </div>
-
-          <div class="card-actions">
-            <button @click="saveOAuth" :disabled="savingOAuth" class="btn-primary">
-              {{ savingOAuth ? '保存中...' : '保存 OpenAuth' }}
-            </button>
-            <span v-if="oauthMsg" class="msg" :class="oauthMsgType">{{ oauthMsg }}</span>
-          </div>
-        </div>
-      </div>
     </div>
   </Layout>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import Layout from '../components/Layout.vue';
 import { api } from '../api';
-
-interface OAuthProviderConfig {
-  name: string;
-  label: string;
-  enabled: boolean;
-  clientId: string;
-  clientSecret: string;
-  scopes?: string[];
-  issuer?: string;
-}
 
 interface CaptchaSettings {
   enabled: boolean;
@@ -123,43 +100,40 @@ interface CaptchaSettings {
   secretKey: string;
 }
 
-interface OAuthSettings {
+interface GitHubSettings {
   enabled: boolean;
-  providers: OAuthProviderConfig[];
+  clientId: string;
+  clientSecret: string;
 }
 
 const captcha = reactive<CaptchaSettings>({ enabled: false, siteKey: '', secretKey: '' });
-const oauth = reactive<OAuthSettings>({ enabled: false, providers: [] });
-const oauthScopes = ref<string[]>([]);
+const github = reactive<GitHubSettings>({ enabled: false, clientId: '', clientSecret: '' });
 const savingCaptcha = ref(false);
-const savingOAuth = ref(false);
+const savingGithub = ref(false);
 const captchaMsg = ref('');
 const captchaMsgType = ref('');
-const oauthMsg = ref('');
-const oauthMsgType = ref('');
+const githubMsg = ref('');
+const githubMsgType = ref('');
 
-const callbackUrl = `${window.location.origin}/api/oauth/callback`;
+const homepageUrl = computed(() => window.location.origin);
+const callbackUrl = computed(() => `${window.location.origin}/api/auth/github/callback`);
 
 async function loadSettings() {
   try {
-    const result = await api.get<{ settings: { captcha: CaptchaSettings; oauth: OAuthSettings } }>('/settings');
+    const result = await api.get<{ settings: { captcha: CaptchaSettings; oauth: any } }>('/settings');
     const s = result.settings;
 
     captcha.enabled = s.captcha.enabled;
     captcha.siteKey = s.captcha.siteKey;
     captcha.secretKey = '';
 
-    oauth.enabled = s.oauth.enabled;
-    oauth.providers = s.oauth.providers.map(p => ({
-      name: p.name,
-      label: p.label,
-      enabled: p.enabled,
-      clientId: p.clientId,
-      clientSecret: '',
-      scopes: p.scopes,
-      issuer: p.issuer
-    }));
-    oauthScopes.value = oauth.providers.map(p => (p.scopes as string[]).join(' '));
+    // 加载 GitHub 设置
+    const githubProvider = s.oauth.providers.find((p: any) => p.name === 'github');
+    if (githubProvider) {
+      github.enabled = githubProvider.enabled;
+      github.clientId = githubProvider.clientId;
+      github.clientSecret = '';
+    }
   } catch (e) {
     console.error('Failed to load settings:', e);
   }
@@ -173,7 +147,7 @@ async function saveCaptcha() {
     captcha.enabled = result.captcha.enabled;
     captcha.siteKey = result.captcha.siteKey;
     captcha.secretKey = '';
-    captchaMsg.value = '✓ 人机验证设置已保存';
+    captchaMsg.value = '保存成功';
     captchaMsgType.value = 'success';
   } catch (e: any) {
     captchaMsg.value = '保存失败';
@@ -184,31 +158,29 @@ async function saveCaptcha() {
   }
 }
 
-async function saveOAuth() {
-  savingOAuth.value = true;
-  oauthMsg.value = '';
+async function saveGithub() {
+  savingGithub.value = true;
+  githubMsg.value = '';
   try {
-    const providers = oauth.providers.map((p, i) => ({
-      name: p.name,
-      label: p.label,
-      enabled: p.enabled,
-      clientId: p.clientId,
-      clientSecret: p.clientSecret,
-      scopes: oauthScopes.value[i] ? oauthScopes.value[i].split(/\s+/) : ['openid', 'email', 'profile'],
-      issuer: p.issuer
-    }));
-    const result = await api.put<{ oauth: OAuthSettings }>('/settings/oauth', { oauth: { enabled: oauth.enabled, providers } });
-    oauth.enabled = result.oauth.enabled;
-    oauth.providers = result.oauth.providers.map(p => ({ ...p, clientSecret: '' }));
-    oauthScopes.value = oauth.providers.map(p => (p.scopes as string[]).join(' '));
-    oauthMsg.value = '✓ OpenAuth 设置已保存';
-    oauthMsgType.value = 'success';
+    const result = await api.put<{ oauth: any }>('/settings/github', {
+      enabled: github.enabled,
+      clientId: github.clientId,
+      clientSecret: github.clientSecret
+    });
+    const githubProvider = result.oauth.providers.find((p: any) => p.name === 'github');
+    if (githubProvider) {
+      github.enabled = githubProvider.enabled;
+      github.clientId = githubProvider.clientId;
+      github.clientSecret = '';
+    }
+    githubMsg.value = '保存成功';
+    githubMsgType.value = 'success';
   } catch (e: any) {
-    oauthMsg.value = '保存失败';
-    oauthMsgType.value = 'error';
+    githubMsg.value = '保存失败';
+    githubMsgType.value = 'error';
   } finally {
-    savingOAuth.value = false;
-    setTimeout(() => { oauthMsg.value = ''; }, 3000);
+    savingGithub.value = false;
+    setTimeout(() => { githubMsg.value = ''; }, 3000);
   }
 }
 
@@ -260,36 +232,31 @@ onMounted(() => { loadSettings(); });
 .msg.success { color: var(--success-color); }
 .msg.error { color: var(--error-color); }
 
-.provider-section {
-  padding: 16px;
+.github-help {
   background-color: var(--hover-bg);
-  border-radius: 10px;
-  border: 1px solid var(--border-color);
-}
-.provider-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-.provider-name { font-weight: 500; color: var(--text-color); }
-.callback-info {
-  margin-top: 8px;
-  padding: 10px 12px;
-  background-color: var(--active-bg);
   border-radius: 8px;
-  font-size: 13px;
+  padding: 16px;
+  font-size: 14px;
   color: var(--text-secondary);
 }
-.callback-info code {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 2px 8px;
-  background-color: var(--card-bg);
-  border-radius: 4px;
-  font-family: monospace;
-  color: var(--primary-color);
-  font-size: 12px;
+
+.github-help h4 {
+  margin: 0 0 12px 0;
+  color: var(--text-color);
+}
+
+.github-help ol {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.github-help li {
+  margin-bottom: 8px;
+}
+
+.github-help ul {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
 }
 
 .toggle {
@@ -299,7 +266,6 @@ onMounted(() => { loadSettings(); });
   height: 26px;
   cursor: pointer;
 }
-.toggle.small { width: 40px; height: 22px; }
 .toggle input { opacity: 0; width: 0; height: 0; }
 .toggle-slider {
   position: absolute;
@@ -319,10 +285,8 @@ onMounted(() => { loadSettings(); });
   border-radius: 50%;
   transition: 0.3s;
 }
-.toggle.small .toggle-slider:before { height: 14px; width: 14px; }
 .toggle input:checked + .toggle-slider { background-color: #667eea; }
 .toggle input:checked + .toggle-slider:before { transform: translateX(22px); }
-.toggle.small input:checked + .toggle-slider:before { transform: translateX(18px); }
 
 .btn-primary {
   padding: 10px 24px;
@@ -340,6 +304,4 @@ onMounted(() => { loadSettings(); });
   box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
 }
 .btn-primary:disabled { opacity: 0.7; cursor: not-allowed; }
-a { color: #667eea; text-decoration: none; }
-a:hover { text-decoration: underline; }
 </style>
