@@ -35,8 +35,12 @@
             placeholder="••••••••"
           />
         </div>
+
+        <div v-if="publicSettings?.captchaEnabled && publicSettings.captchaSiteKey" class="captcha-wrapper">
+          <div ref="turnstileRef" class="cf-turnstile" :data-sitekey="publicSettings.captchaSiteKey"></div>
+        </div>
         
-        <button type="submit" :disabled="authStore.loading">
+        <button type="submit" :disabled="authStore.loading" class="btn-primary">
           {{ authStore.loading ? '注册中...' : '注册' }}
         </button>
       </form>
@@ -52,9 +56,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import { api } from '../api';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -62,6 +67,12 @@ const authStore = useAuthStore();
 const email = ref('');
 const password = ref('');
 const confirmPassword = ref('');
+const turnstileRef = ref<HTMLElement | null>(null);
+const captchaToken = ref<string>('');
+const publicSettings = ref<{
+  captchaEnabled: boolean;
+  captchaSiteKey: string;
+} | null>(null);
 
 const passwordError = computed(() => {
   if (password.value && confirmPassword.value && password.value !== confirmPassword.value) {
@@ -70,14 +81,79 @@ const passwordError = computed(() => {
   return null;
 });
 
+async function loadPublicSettings() {
+  try {
+    const result = await api.get<{ captchaEnabled: boolean; captchaSiteKey: string }>('/settings/public');
+    publicSettings.value = result;
+
+    if (result.captchaEnabled && result.captchaSiteKey) {
+      loadTurnstile();
+    }
+  } catch (e) {
+    console.error('Failed to load public settings:', e);
+  }
+}
+
+function loadTurnstile(): Promise<void> {
+  return new Promise((resolve) => {
+    if ((window as any).turnstile) {
+      renderTurnstile();
+      resolve();
+      return;
+    }
+
+    const existingScript = document.querySelector('script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]');
+    if (existingScript) {
+      existingScript.addEventListener('load', () => {
+        renderTurnstile();
+        resolve();
+      });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+    script.async = true;
+    script.onload = () => {
+      renderTurnstile();
+      resolve();
+    };
+    document.head.appendChild(script);
+  });
+}
+
+function renderTurnstile() {
+  if (!turnstileRef.value || !publicSettings.value?.captchaSiteKey) return;
+  
+  if ((window as any).turnstile) {
+    (window as any).turnstile.render(turnstileRef.value, {
+      sitekey: publicSettings.value.captchaSiteKey,
+      callback: (token: string) => {
+        captchaToken.value = token;
+      }
+    });
+  }
+}
+
 async function handleRegister() {
   if (passwordError.value) return;
   
-  const success = await authStore.register(email.value, password.value);
+  const success = await authStore.register(email.value, password.value, captchaToken.value);
   if (success) {
     router.push('/');
   }
 }
+
+onMounted(() => {
+  loadPublicSettings();
+});
+
+onUnmounted(() => {
+  const script = document.querySelector('script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]');
+  if (script) {
+    document.head.removeChild(script);
+  }
+});
 </script>
 
 <style scoped>
@@ -178,5 +254,24 @@ button:disabled {
 
 .link a:hover {
   text-decoration: underline;
+}
+
+.captcha-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.cf-turnstile {
+  display: inline-flex;
+}
+
+.auth-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
 }
 </style>

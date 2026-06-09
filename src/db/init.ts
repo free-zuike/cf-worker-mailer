@@ -4,7 +4,6 @@ export async function initDatabase(env: Env) {
   try {
     console.log('Initializing database...');
 
-    // Check if users table exists
     const usersTable = await env.DB.prepare(
       "SELECT name FROM sqlite_master WHERE type='table' AND name='users'"
     ).first();
@@ -12,7 +11,6 @@ export async function initDatabase(env: Env) {
     if (!usersTable) {
       console.log('Creating database tables...');
 
-      // Create users table
       await env.DB.prepare(`
         CREATE TABLE users (
           id TEXT PRIMARY KEY,
@@ -31,7 +29,6 @@ export async function initDatabase(env: Env) {
         )
       `).run();
 
-      // Create smtp_configs table
       await env.DB.prepare(`
         CREATE TABLE smtp_configs (
           id TEXT PRIMARY KEY,
@@ -51,7 +48,6 @@ export async function initDatabase(env: Env) {
         )
       `).run();
 
-      // Create email_templates table
       await env.DB.prepare(`
         CREATE TABLE email_templates (
           id TEXT PRIMARY KEY,
@@ -66,7 +62,6 @@ export async function initDatabase(env: Env) {
         )
       `).run();
 
-      // Create email_history table
       await env.DB.prepare(`
         CREATE TABLE email_history (
           id TEXT PRIMARY KEY,
@@ -88,11 +83,30 @@ export async function initDatabase(env: Env) {
         )
       `).run();
 
+      await env.DB.prepare(`
+        CREATE TABLE oauth_states (
+          id TEXT PRIMARY KEY,
+          state TEXT NOT NULL UNIQUE,
+          user_id TEXT,
+          redirect_uri TEXT NOT NULL,
+          expires_at INTEGER NOT NULL,
+          created_at TEXT NOT NULL
+        )
+      `).run();
+
+      await env.DB.prepare(`
+        CREATE TABLE user_settings (
+          user_id TEXT PRIMARY KEY,
+          settings TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      `).run();
+
       console.log('Database tables created successfully');
     } else {
       console.log('Database already exists, checking for missing columns...');
 
-      // Check if smtp_configs has type column
       const smtpColumns = await env.DB.prepare(
         "PRAGMA table_info(smtp_configs)"
       ).all();
@@ -105,7 +119,6 @@ export async function initDatabase(env: Env) {
         console.log('Type column added successfully');
       }
 
-      // Check if users has oauth_provider and oauth_provider_id columns
       const userColumns = await env.DB.prepare(
         "PRAGMA table_info(users)"
       ).all();
@@ -126,11 +139,10 @@ export async function initDatabase(env: Env) {
       }
     }
 
-    // Check if oauth_states table exists
+    // 检查 oauth_states 表
     const oauthStatesTable = await env.DB.prepare(
       "SELECT name FROM sqlite_master WHERE type='table' AND name='oauth_states'"
     ).first();
-
     if (!oauthStatesTable) {
       console.log('Creating oauth_states table...');
       await env.DB.prepare(`
@@ -144,6 +156,23 @@ export async function initDatabase(env: Env) {
         )
       `).run();
       console.log('oauth_states table created successfully');
+    }
+
+    // 检查 user_settings 表
+    const userSettingsTable = await env.DB.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='user_settings'"
+    ).first();
+    if (!userSettingsTable) {
+      console.log('Creating user_settings table...');
+      await env.DB.prepare(`
+        CREATE TABLE user_settings (
+          user_id TEXT PRIMARY KEY,
+          settings TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      `).run();
+      console.log('user_settings table created successfully');
     }
 
     console.log('Database initialization completed');

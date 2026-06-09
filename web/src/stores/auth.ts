@@ -109,12 +109,12 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // 登录
-  async function login(email: string, password: string) {
+  async function login(email: string, password: string, captchaToken?: string) {
     loading.value = true;
     error.value = null;
 
     try {
-      const response = await api.post('/auth/login', { email, password });
+      const response = await api.post('/auth/login', { email, password, captchaToken });
       user.value = response.user;
       token.value = response.token;
       saveSession();
@@ -128,12 +128,12 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // 注册
-  async function register(email: string, password: string) {
+  async function register(email: string, password: string, captchaToken?: string) {
     loading.value = true;
     error.value = null;
 
     try {
-      const response = await api.post('/auth/register', { email, password });
+      const response = await api.post('/auth/register', { email, password, captchaToken });
       user.value = response.user;
       token.value = response.token;
       saveSession();

@@ -18,6 +18,9 @@
         <router-link to="/history" class="nav-item" active-class="active">
           <span>📜</span> 发送历史
         </router-link>
+        <router-link to="/settings" class="nav-item" active-class="active">
+          <span>🔧</span> 设置
+        </router-link>
       </nav>
       
       <div class="sidebar-footer">

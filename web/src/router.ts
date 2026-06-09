@@ -42,6 +42,12 @@ const routes = [
     name: 'EmailHistory',
     component: () => import('./views/EmailHistory.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/settings',
+    name: 'Settings',
+    component: () => import('./views/Settings.vue'),
+    meta: { requiresAuth: true }
   }
 ];
 

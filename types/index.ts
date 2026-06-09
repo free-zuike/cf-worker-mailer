@@ -18,24 +18,6 @@ export interface UserToken {
   expiresAt: number;
 }
 
-// ==================== API 密钥相关类型 ====================
-export interface ApiKey {
-  id: string;
-  userId: string;
-  name: string;
-  scopes?: string[];
-  expiresAt?: number;
-  lastUsedAt?: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateApiKeyRequest {
-  name: string;
-  scopes?: string[];
-  expiresAt?: number;
-}
-
 // ==================== SMTP 配置相关类型 ====================
 export interface SmtpConfig {
   id: string;
@@ -74,41 +56,6 @@ export interface UpdateSmtpConfigRequest {
   fromName?: string;
   secure?: boolean;
   enabled?: boolean;
-}
-
-// ==================== OAuth 相关类型 ====================
-export interface OAuthProvider {
-  id: string;
-  name: string;
-  clientId: string;
-  clientSecret: string;
-  scopes: string[];
-  enabled: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface OAuthState {
-  id: string;
-  state: string;
-  userId?: string;
-  redirectUri: string;
-  expiresAt: number;
-  createdAt: string;
-}
-
-export interface OAuthCallbackRequest {
-  code: string;
-  state: string;
-}
-
-export interface OAuthTokenResponse {
-  accessToken: string;
-  refreshToken?: string;
-  expiresAt: number;
-  provider: string;
-  providerUserId: string;
-  email: string;
 }
 
 // ==================== 邮件模板相关类型 ====================
@@ -164,7 +111,7 @@ export interface EmailRequest {
 
 export interface Attachment {
   filename: string;
-  content: string; // base64 编码
+  content: string;
   contentType?: string;
 }
 
@@ -193,22 +140,6 @@ export interface EmailHistory {
   createdAt: string;
 }
 
-// ==================== 域名验证相关类型 ====================
-export interface DomainVerification {
-  id: string;
-  userId: string;
-  domain: string;
-  verificationCode: string;
-  verified: boolean;
-  verifiedAt?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateDomainVerificationRequest {
-  domain: string;
-}
-
 // ==================== 统计相关类型 ====================
 export interface EmailMetrics {
   total: number;
@@ -216,6 +147,27 @@ export interface EmailMetrics {
   failed: number;
   pending: number;
   byDay: Record<string, { total: number; sent: number; failed: number }>;
+}
+
+// ==================== 后台设置相关类型 ====================
+export interface OAuthProviderConfig {
+  name: string;
+  label: string;
+  enabled: boolean;
+  clientId: string;
+  clientSecret: string;
+  scopes?: string[];
+}
+
+export interface Settings {
+  oauthEnabled: boolean;
+  oauthProviders: OAuthProviderConfig[];
+  captchaEnabled: boolean;
+  captchaProvider: 'turnstile' | 'recaptcha';
+  captchaSiteKey: string;
+  captchaSecretKey: string;
+  theme: 'light' | 'dark';
+  updatedAt: string;
 }
 
 // ==================== 环境类型 ====================
@@ -226,9 +178,4 @@ export interface Env {
   ADMIN_PASSWORD?: string;
   ADMIN_EMAIL?: string;
   ALLOWED_ORIGINS?: string;
-  // OAuth 配置
-  GITHUB_CLIENT_ID?: string;
-  GITHUB_CLIENT_SECRET?: string;
-  GOOGLE_CLIENT_ID?: string;
-  GOOGLE_CLIENT_SECRET?: string;
 }

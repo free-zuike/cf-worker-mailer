@@ -24,23 +24,26 @@
             placeholder="••••••••"
           />
         </div>
+
+        <div v-if="publicSettings?.captchaEnabled && publicSettings.captchaSiteKey" class="captcha-wrapper">
+          <div ref="turnstileRef" class="cf-turnstile" :data-sitekey="publicSettings.captchaSiteKey"></div>
+        </div>
         
         <button type="submit" :disabled="authStore.loading" class="btn-primary">
           {{ authStore.loading ? '登录中...' : '登录' }}
         </button>
       </form>
-      
-      <div v-if="oauthProviders.length > 0" class="oauth-section">
+
+      <div v-if="publicSettings?.oauthEnabled && publicSettings.oauthProviders?.length > 0" class="oauth-section">
         <div class="divider">
           <span>或者</span>
         </div>
         
         <div class="oauth-buttons">
           <button
-            v-for="provider in oauthProviders"
+            v-for="provider in publicSettings.oauthProviders"
             :key="provider.name"
             @click="handleOAuth(provider.name)"
-            :disabled="authStore.loading"
             class="btn-oauth"
             :class="provider.name"
           >
@@ -60,7 +63,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { api } from '../api';
@@ -70,19 +73,82 @@ const authStore = useAuthStore();
 
 const email = ref('');
 const password = ref('');
-const oauthProviders = ref<{ name: string; label: string; enabled: boolean }[]>([]);
+const turnstileRef = ref<HTMLElement | null>(null);
+const captchaToken = ref<string>('');
+const publicSettings = ref<{
+  captchaEnabled: boolean;
+  captchaProvider: string;
+  captchaSiteKey: string;
+  oauthEnabled: boolean;
+  oauthProviders: { name: string; label: string; enabled: boolean }[];
+} | null>(null);
 
-async function loadOAuthProviders() {
+async function loadPublicSettings() {
   try {
-    const result = await api.get<{ providers: typeof oauthProviders.value }>('/oauth/providers');
-    oauthProviders.value = result.providers.filter(p => p.enabled);
+    const result = await api.get<{
+      captchaEnabled: boolean;
+      captchaProvider: string;
+      captchaSiteKey: string;
+      oauthEnabled: boolean;
+      oauthProviders: { name: string; label: string; enabled: boolean }[];
+    }>('/settings/public');
+    publicSettings.value = result;
+
+    if (result.captchaEnabled && result.captchaSiteKey) {
+      await loadTurnstile();
+    }
   } catch (e) {
-    console.error('Failed to load OAuth providers:', e);
+    console.error('Failed to load public settings:', e);
+  }
+}
+
+function loadTurnstile(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if ((window as any).turnstile) {
+      renderTurnstile();
+      resolve();
+      return;
+    }
+
+    const existingScript = document.querySelector('script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]');
+    if (existingScript) {
+      existingScript.addEventListener('load', () => {
+        renderTurnstile();
+        resolve();
+      });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+    script.async = true;
+    script.onload = () => {
+      renderTurnstile();
+      resolve();
+    };
+    script.onerror = () => reject(new Error('Failed to load Turnstile'));
+    document.head.appendChild(script);
+  });
+}
+
+function renderTurnstile() {
+  if (!turnstileRef.value || !publicSettings.value?.captchaSiteKey) return;
+  
+  if ((window as any).turnstile) {
+    (window as any).turnstile.render(turnstileRef.value, {
+      sitekey: publicSettings.value.captchaSiteKey,
+      callback: (token: string) => {
+        captchaToken.value = token;
+      },
+      'error-callback': () => {
+        captchaToken.value = '';
+      }
+    });
   }
 }
 
 async function handleLogin() {
-  const success = await authStore.login(email.value, password.value);
+  const success = await authStore.login(email.value, password.value, captchaToken.value);
   if (success) {
     router.push('/');
   }
@@ -90,9 +156,8 @@ async function handleLogin() {
 
 async function handleOAuth(provider: string) {
   try {
-    const redirectUri = `${window.location.origin}/oauth/callback`;
     const result = await api.get<{ authUrl: string }>('/oauth/authorize', {
-      params: { provider, redirect_uri: redirectUri }
+      params: { provider, redirect_uri: `${window.location.origin}/oauth/callback` }
     });
     window.location.href = result.authUrl;
   } catch (e) {
@@ -101,7 +166,14 @@ async function handleOAuth(provider: string) {
 }
 
 onMounted(() => {
-  loadOAuthProviders();
+  loadPublicSettings();
+});
+
+onUnmounted(() => {
+  const script = document.querySelector('script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]');
+  if (script) {
+    document.head.removeChild(script);
+  }
 });
 </script>
 
@@ -112,55 +184,76 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
 }
 
 .auth-card {
   background: white;
   padding: 40px;
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   width: 100%;
   max-width: 400px;
 }
 
 .auth-card h1 {
   text-align: center;
-  color: #667eea;
-  margin-bottom: 10px;
+  color: #1f2937;
+  font-size: 24px;
+  margin: 0 0 8px 0;
 }
 
 .auth-card h2 {
   text-align: center;
-  color: #333;
-  margin-bottom: 30px;
+  color: #6b7280;
+  font-size: 18px;
+  font-weight: 500;
+  margin: 0 0 30px 0;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .form-group {
-  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .form-group label {
-  display: block;
-  margin-bottom: 8px;
-  color: #555;
+  font-size: 14px;
   font-weight: 500;
+  color: #4b5563;
 }
 
 .form-group input {
-  width: 100%;
-  padding: 12px;
-  border: 2px solid #e1e5eb;
+  padding: 12px 16px;
+  border: 1px solid #e1e5eb;
   border-radius: 8px;
-  font-size: 16px;
-  transition: border-color 0.3s;
+  font-size: 15px;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .form-group input:focus {
   outline: none;
   border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
-button {
+.captcha-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.cf-turnstile {
+  display: inline-flex;
+}
+
+.btn-primary {
   width: 100%;
   padding: 14px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -173,36 +266,14 @@ button {
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
-button:hover:not(:disabled) {
+.btn-primary:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
 }
 
-button:disabled {
+.btn-primary:disabled {
   opacity: 0.7;
   cursor: not-allowed;
-}
-
-.error {
-  color: #e74c3c;
-  text-align: center;
-  margin-top: 20px;
-}
-
-.link {
-  text-align: center;
-  margin-top: 20px;
-  color: #666;
-}
-
-.link a {
-  color: #667eea;
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.link a:hover {
-  text-decoration: underline;
 }
 
 .oauth-section {
@@ -231,67 +302,62 @@ button:disabled {
 
 .oauth-buttons {
   display: flex;
+  flex-direction: column;
   gap: 12px;
 }
 
 .btn-oauth {
-  flex: 1;
   padding: 12px;
-  border: none;
+  border: 1px solid #e1e5eb;
+  background: white;
+  color: #1f2937;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
 }
 
-.btn-oauth.github {
-  background: #24292e;
-  color: white;
+.btn-oauth:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #d1d5db;
 }
 
 .btn-oauth.github:hover:not(:disabled) {
-  background: #30363d;
-}
-
-.btn-oauth.google {
-  background: #fff;
-  color: #333;
-  border: 1px solid #ddd;
-}
-
-.btn-oauth.google:hover:not(:disabled) {
-  background: #f5f5f5;
+  background: #24292e;
+  color: white;
+  border-color: #24292e;
 }
 
 .oauth-icon {
   font-size: 18px;
 }
 
-.btn-primary {
-  width: 100%;
-  padding: 14px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+.error {
+  color: #ef4444;
+  text-align: center;
+  margin-top: 16px;
+  font-size: 14px;
 }
 
-.btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+.link {
+  text-align: center;
+  margin-top: 20px;
+  color: #6b7280;
+  font-size: 14px;
 }
 
-.btn-primary:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
+.link a {
+  color: #667eea;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.link a:hover {
+  text-decoration: underline;
 }
 </style>
