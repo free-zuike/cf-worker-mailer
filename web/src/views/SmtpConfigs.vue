@@ -275,46 +275,24 @@ onMounted(() => {
 
 .page-header h2 {
   font-size: 28px;
-  color: #1e3a5f;
+  color: var(--text-color);
   margin: 0;
-}
-
-.btn-primary {
-  padding: 12px 24px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
-}
-
-.btn-primary:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
 }
 
 .btn-secondary {
   padding: 10px 20px;
-  background: #f0f4f8;
-  color: #1e3a5f;
+  background-color: var(--hover-bg);
+  color: var(--text-color);
   border: none;
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background-color 0.2s;
 }
 
 .btn-secondary:hover {
-  background: #e1e8f0;
+  background-color: var(--active-bg);
 }
 
 .btn-danger {
@@ -336,9 +314,9 @@ onMounted(() => {
 .empty-state {
   text-align: center;
   padding: 80px 20px;
-  background: white;
+  background-color: var(--card-bg);
   border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--card-shadow);
 }
 
 .empty-icon {
@@ -347,18 +325,18 @@ onMounted(() => {
 }
 
 .empty-state p {
-  color: #333;
+  color: var(--text-color);
   font-size: 18px;
   margin-bottom: 8px;
 }
 
 .empty-desc {
-  color: #888 !important;
+  color: var(--text-muted) !important;
   font-size: 14px !important;
 }
 
 .empty-tip {
-  color: #667eea !important;
+  color: var(--primary-color) !important;
   font-size: 14px !important;
   margin-top: 16px;
 }
@@ -370,10 +348,10 @@ onMounted(() => {
 }
 
 .config-card {
-  background: white;
+  background-color: var(--card-bg);
   border-radius: 12px;
   padding: 24px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--card-shadow);
 }
 
 .config-header {
@@ -387,7 +365,7 @@ onMounted(() => {
 .config-name {
   font-size: 18px;
   font-weight: 600;
-  color: #1e3a5f;
+  color: var(--text-color);
 }
 
 .config-type {
@@ -421,8 +399,8 @@ onMounted(() => {
 }
 
 .config-status.inactive {
-  background: #f5f5f5;
-  color: #888;
+  background: var(--hover-bg);
+  color: var(--text-muted);
 }
 
 .config-details {
@@ -436,13 +414,13 @@ onMounted(() => {
 }
 
 .detail-label {
-  color: #888;
+  color: var(--text-muted);
   width: 80px;
   flex-shrink: 0;
 }
 
 .detail-value {
-  color: #333;
+  color: var(--text-color);
 }
 
 .config-actions {
@@ -461,7 +439,7 @@ onMounted(() => {
 }
 
 .modal {
-  background: white;
+  background-color: var(--card-bg);
   border-radius: 12px;
   width: 90%;
   max-width: 600px;
@@ -474,12 +452,12 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 24px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .modal-header h3 {
   font-size: 20px;
-  color: #1e3a5f;
+  color: var(--text-color);
   margin: 0;
 }
 
@@ -487,7 +465,7 @@ onMounted(() => {
   background: none;
   border: none;
   font-size: 28px;
-  color: #888;
+  color: var(--text-muted);
   cursor: pointer;
   line-height: 1;
 }
@@ -503,7 +481,7 @@ onMounted(() => {
 .form-group label {
   display: block;
   margin-bottom: 8px;
-  color: #333;
+  color: var(--text-color);
   font-weight: 500;
   font-size: 14px;
 }
@@ -512,17 +490,18 @@ onMounted(() => {
 .form-group .form-select {
   width: 100%;
   padding: 12px;
-  border: 2px solid #e1e5eb;
+  border: 2px solid var(--input-border);
   border-radius: 8px;
   font-size: 15px;
   transition: border-color 0.2s;
-  background: white;
+  background-color: var(--input-bg);
+  color: var(--text-color);
 }
 
 .form-group input:focus,
 .form-group .form-select:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: var(--input-focus);
 }
 
 .form-group .form-select {

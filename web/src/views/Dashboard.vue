@@ -331,12 +331,12 @@ onMounted(() => {
 
 .page-header h2 {
   font-size: 28px;
-  color: #1e3a5f;
+  color: var(--text-color);
   margin-bottom: 8px;
 }
 
 .page-header p {
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .stats-grid {
@@ -347,13 +347,13 @@ onMounted(() => {
 }
 
 .stat-card {
-  background: white;
+  background-color: var(--card-bg);
   border-radius: 12px;
   padding: 24px;
   display: flex;
   align-items: center;
   gap: 16px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--card-shadow);
 }
 
 .stat-icon {
@@ -378,11 +378,11 @@ onMounted(() => {
 .stat-value {
   font-size: 32px;
   font-weight: 700;
-  color: #1e3a5f;
+  color: var(--text-color);
 }
 
 .stat-label {
-  color: #888;
+  color: var(--text-muted);
   font-size: 14px;
 }
 
@@ -392,7 +392,7 @@ onMounted(() => {
 
 .quick-actions h3 {
   font-size: 20px;
-  color: #1e3a5f;
+  color: var(--text-color);
   margin-bottom: 20px;
 }
 
@@ -403,12 +403,12 @@ onMounted(() => {
 }
 
 .action-card {
-  background: white;
+  background-color: var(--card-bg);
   border-radius: 12px;
   padding: 24px;
   text-decoration: none;
   color: inherit;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--card-shadow);
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
@@ -425,20 +425,20 @@ onMounted(() => {
 .action-title {
   font-size: 18px;
   font-weight: 600;
-  color: #1e3a5f;
+  color: var(--text-color);
   margin-bottom: 4px;
 }
 
 .action-desc {
-  color: #888;
+  color: var(--text-muted);
   font-size: 14px;
 }
 
 .send-section {
-  background: white;
+  background-color: var(--card-bg);
   border-radius: 12px;
   padding: 32px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--card-shadow);
 }
 
 .section-header {
@@ -450,36 +450,36 @@ onMounted(() => {
 
 .section-header h3 {
   font-size: 20px;
-  color: #1e3a5f;
+  color: var(--text-color);
   margin: 0;
 }
 
 .editor-toggle {
   display: flex;
   gap: 4px;
-  background: #f5f7fa;
+  background-color: var(--hover-bg);
   padding: 4px;
   border-radius: 8px;
 }
 
 .toggle-btn {
   padding: 8px 16px;
-  background: transparent;
+  background-color: transparent;
   border: none;
   border-radius: 6px;
   font-size: 14px;
   cursor: pointer;
-  color: #666;
+  color: var(--text-secondary);
   transition: all 0.2s;
 }
 
 .toggle-btn:hover {
-  color: #333;
+  color: var(--text-color);
 }
 
 .toggle-btn.active {
-  background: white;
-  color: #1e3a5f;
+  background-color: var(--card-bg);
+  color: var(--text-color);
   font-weight: 600;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
 }
@@ -495,24 +495,25 @@ onMounted(() => {
 .template-select label {
   display: block;
   margin-bottom: 8px;
-  color: #333;
+  color: var(--text-color);
   font-weight: 500;
 }
 
 .form-select {
   width: 100%;
   padding: 12px;
-  border: 2px solid #e1e5eb;
+  border: 2px solid var(--input-border);
   border-radius: 8px;
   font-size: 15px;
-  background: white;
+  background-color: var(--input-bg);
+  color: var(--text-color);
   cursor: pointer;
   transition: border-color 0.2s;
 }
 
 .form-select:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: var(--input-focus);
 }
 
 .form-row {
@@ -534,29 +535,31 @@ onMounted(() => {
 .form-group label {
   display: block;
   margin-bottom: 8px;
-  color: #333;
+  color: var(--text-color);
   font-weight: 500;
 }
 
 .required {
-  color: #e74c3c;
+  color: var(--error-color);
 }
 
 .form-group input,
 .form-group textarea {
   width: 100%;
   padding: 12px;
-  border: 2px solid #e1e5eb;
+  border: 2px solid var(--input-border);
   border-radius: 8px;
   font-size: 15px;
   font-family: inherit;
   transition: border-color 0.2s;
+  background-color: var(--input-bg);
+  color: var(--text-color);
 }
 
 .form-group input:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: var(--input-focus);
 }
 
 .content-header {
@@ -575,34 +578,34 @@ onMounted(() => {
 
 .rich-editor-toolbar button {
   padding: 6px 10px;
-  background: #f5f7fa;
-  border: 1px solid #e1e5eb;
+  background-color: var(--hover-bg);
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   cursor: pointer;
   font-size: 13px;
   transition: all 0.2s;
+  color: var(--text-color);
 }
 
 .rich-editor-toolbar button:hover {
-  background: #e8f0f7;
-  border-color: #cbd5e1;
+  background-color: var(--active-bg);
 }
 
 .rich-editor-toolbar button.active {
-  background: #667eea;
+  background-color: var(--primary-color);
   color: white;
-  border-color: #667eea;
+  border-color: var(--primary-color);
 }
 
 .toolbar-separator {
   width: 1px;
   height: 20px;
-  background: #e1e5eb;
+  background-color: var(--border-color);
   margin: 0 4px;
 }
 
 .rich-editor-wrapper {
-  border: 2px solid #e1e5eb;
+  border: 2px solid var(--input-border);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -612,22 +615,24 @@ onMounted(() => {
   padding: 16px;
   outline: none;
   line-height: 1.6;
+  color: var(--text-color);
+  background-color: var(--input-bg);
 }
 
 .rich-editor:focus {
-  border-color: #667eea;
+  border-color: var(--input-focus);
 }
 
 .rich-editor:empty:before {
   content: attr(placeholder);
-  color: #999;
+  color: var(--text-muted);
 }
 
 .email-preview {
   min-height: 300px;
   padding: 16px;
-  background: #fafafa;
-  border-top: 1px solid #e1e5eb;
+  background-color: var(--hover-bg);
+  border-top: 1px solid var(--border-color);
 }
 
 .html-editor {
@@ -644,48 +649,13 @@ onMounted(() => {
   margin-top: 24px;
 }
 
-.btn-primary,
-.btn-secondary {
-  padding: 14px 32px;
-  border: none;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
-}
-
-.btn-primary:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: #f5f7fa;
-  color: #1e3a5f;
-}
-
-.btn-secondary:hover {
-  background: #e8f0f7;
-}
-
 .error {
-  color: #e74c3c;
+  color: var(--error-color);
   margin-top: 16px;
 }
 
 .success {
-  color: #27ae60;
+  color: var(--success-color);
   margin-top: 16px;
 }
 </style>
