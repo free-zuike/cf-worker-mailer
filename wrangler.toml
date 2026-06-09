@@ -35,7 +35,7 @@ migrations_dir = "migrations"
 # ------------------------------------------
 # Cloudflare Queues - 邮件异步发送队列
 # ------------------------------------------
-[[queues]]
+[queues]
 binding = "EMAIL_QUEUE"
 queue_name = "cf-worker-mailer-queue"
 max_retries = 3
