@@ -6,15 +6,30 @@ import { SmtpService } from '../services/smtpService';
 import { EmailService } from '../services/emailService';
 import { SettingsService } from '../services/settingsService';
 import { PreferencesService } from '../services/preferencesService';
+import { CaptchaService } from '../services/captchaService';
 
 const api = new Hono<{ Bindings: Env; Variables: { user: User } }>();
 
 // ==================== 认证路由 ====================
 api.post('/auth/register', async (c) => {
   try {
-    const { email, password } = await c.req.json();
+    const { email, password, captchaToken } = await c.req.json();
     if (!email || !password) {
       return c.json({ error: 'Email and password are required' }, 400);
+    }
+
+    // 验证人机验证
+    const settings = new SettingsService(c.env);
+    const settingsData = await settings.getSettings();
+    if (settingsData.captcha.enabled && settingsData.captcha.secretKey) {
+      if (!captchaToken) {
+        return c.json({ error: 'Captcha verification required' }, 400);
+      }
+      const captchaService = new CaptchaService(c.env, settingsData.captcha.secretKey);
+      const captchaResult = await captchaService.verify(captchaToken);
+      if (!captchaResult) {
+        return c.json({ error: 'Captcha verification failed' }, 400);
+      }
     }
 
     const userService = new UserService(c.env);
@@ -32,9 +47,23 @@ api.post('/auth/register', async (c) => {
 
 api.post('/auth/login', async (c) => {
   try {
-    const { email, password } = await c.req.json();
+    const { email, password, captchaToken } = await c.req.json();
     if (!email || !password) {
       return c.json({ error: 'Email and password are required' }, 400);
+    }
+
+    // 验证人机验证
+    const settings = new SettingsService(c.env);
+    const settingsData = await settings.getSettings();
+    if (settingsData.captcha.enabled && settingsData.captcha.secretKey) {
+      if (!captchaToken) {
+        return c.json({ error: 'Captcha verification required' }, 400);
+      }
+      const captchaService = new CaptchaService(c.env, settingsData.captcha.secretKey);
+      const captchaResult = await captchaService.verify(captchaToken);
+      if (!captchaResult) {
+        return c.json({ error: 'Captcha verification failed' }, 400);
+      }
     }
 
     const userService = new UserService(c.env);

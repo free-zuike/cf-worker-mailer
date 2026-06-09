@@ -24,6 +24,11 @@
             placeholder="••••••••"
           />
         </div>
+
+        <div v-if="captchaEnabled" class="captcha-container">
+          <div ref="captchaRef" class="turnstile-widget"></div>
+          <p v-if="captchaError" class="captcha-error">请完成人机验证</p>
+        </div>
         
         <button type="submit" :disabled="authStore.loading">
           {{ authStore.loading ? '登录中...' : '登录' }}
@@ -40,22 +45,100 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import { api } from '../api';
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (container: string | HTMLElement, options: any) => string;
+      reset: (widgetId: string) => void;
+      remove: (widgetId: string) => void;
+    };
+  }
+}
 
 const router = useRouter();
 const authStore = useAuthStore();
 
 const email = ref('');
 const password = ref('');
+const captchaRef = ref<HTMLElement | null>(null);
+const captchaEnabled = ref(false);
+const captchaSiteKey = ref('');
+const captchaError = ref(false);
+const captchaToken = ref('');
+let widgetId: string | null = null;
+
+async function loadCaptchaSettings() {
+  try {
+    const result = await api.get<{ captchaEnabled: boolean; captchaSiteKey: string }>('/settings/public');
+    if (result.captchaEnabled && result.captchaSiteKey) {
+      captchaEnabled.value = true;
+      captchaSiteKey.value = result.captchaSiteKey;
+    }
+  } catch (e) {
+    console.error('Failed to load captcha settings', e);
+  }
+}
+
+function loadTurnstileScript(): Promise<void> {
+  return new Promise((resolve) => {
+    if (window.turnstile) {
+      resolve();
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+    script.async = true;
+    script.onload = () => resolve();
+    document.head.appendChild(script);
+  });
+}
+
+function renderTurnstile() {
+  if (!captchaRef.value || !captchaEnabled.value || !captchaSiteKey.value) return;
+  if (window.turnstile && widgetId === null) {
+    widgetId = window.turnstile.render(captchaRef.value, {
+      sitekey: captchaSiteKey.value,
+      callback: (token: string) => {
+        captchaToken.value = token;
+        captchaError.value = false;
+      },
+      'error-callback': () => {
+        captchaToken.value = '';
+        captchaError.value = true;
+      },
+      'expired-callback': () => {
+        captchaToken.value = '';
+        captchaError.value = true;
+      }
+    });
+  }
+}
 
 async function handleLogin() {
-  const success = await authStore.login(email.value, password.value);
+  // 如果启用了人机验证，检查是否通过
+  if (captchaEnabled.value && !captchaToken.value) {
+    captchaError.value = true;
+    return;
+  }
+
+  const success = await authStore.login(email.value, password.value, captchaToken.value || undefined);
   if (success) {
     router.push('/');
   }
 }
+
+onMounted(async () => {
+  await loadCaptchaSettings();
+  if (captchaEnabled.value) {
+    await loadTurnstileScript();
+    renderTurnstile();
+  }
+});
 </script>
 
 <style scoped>
@@ -156,5 +239,18 @@ button:disabled {
 
 .link a:hover {
   text-decoration: underline;
+}
+
+.captcha-container {
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.captcha-error {
+  color: #e74c3c;
+  font-size: 14px;
+  margin-top: 8px;
 }
 </style>
