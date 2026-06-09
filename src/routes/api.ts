@@ -4,6 +4,7 @@ import { authMiddleware } from '../middleware/auth';
 import { UserService } from '../services/userService';
 import { SmtpService } from '../services/smtpService';
 import { EmailService } from '../services/emailService';
+import { OAuthService } from '../services/oauthService';
 
 const api = new Hono<{ Bindings: Env; Variables: { user: User } }>();
 
@@ -58,6 +59,77 @@ api.post('/auth/refresh', async (c) => {
   } catch (error) {
     return c.json({ error: 'Invalid refresh token' }, 401);
   }
+});
+
+// OAuth 路由
+api.get('/oauth/authorize', async (c) => {
+  try {
+    const provider = c.req.query('provider');
+    const redirectUri = c.req.query('redirect_uri');
+    
+    if (!provider || !redirectUri) {
+      return c.json({ error: 'provider and redirect_uri are required' }, 400);
+    }
+
+    const oauthService = new OAuthService(c.env);
+    const authUrl = await oauthService.getAuthorizationUrl(provider, redirectUri);
+
+    return c.json({ authUrl });
+  } catch (error) {
+    return c.json({ error: (error as Error).message }, 500);
+  }
+});
+
+api.get('/oauth/callback', async (c) => {
+  try {
+    const provider = c.req.query('provider');
+    const code = c.req.query('code');
+    const state = c.req.query('state');
+
+    if (!provider || !code || !state) {
+      return c.json({ error: 'provider, code, and state are required' }, 400);
+    }
+
+    const oauthService = new OAuthService(c.env);
+    const oauthState = await oauthService.getState(state);
+
+    if (!oauthState || oauthState.expiresAt < Date.now()) {
+      return c.json({ error: 'Invalid or expired state' }, 400);
+    }
+
+    const tokenResponse = await oauthService.exchangeCode(provider, code, oauthState.redirectUri);
+    await oauthService.deleteState(state);
+
+    const userService = new UserService(c.env);
+    let user = await userService.findByEmail(tokenResponse.email);
+
+    if (!user) {
+      user = await userService.createOAuthUser(tokenResponse.email, provider, tokenResponse.providerUserId);
+    }
+
+    const { token } = await userService.generateToken(user.id);
+
+    return c.redirect(`${oauthState.redirectUri}?token=${token.token}&refreshToken=${token.refreshToken}&expiresAt=${token.expiresAt}`);
+  } catch (error) {
+    return c.json({ error: (error as Error).message }, 500);
+  }
+});
+
+api.get('/oauth/providers', async (c) => {
+  const providers = [
+    {
+      name: 'github',
+      label: 'GitHub',
+      enabled: !!c.env.GITHUB_CLIENT_ID && !!c.env.GITHUB_CLIENT_SECRET
+    },
+    {
+      name: 'google',
+      label: 'Google',
+      enabled: !!c.env.GOOGLE_CLIENT_ID && !!c.env.GOOGLE_CLIENT_SECRET
+    }
+  ];
+
+  return c.json({ providers });
 });
 
 // 受保护的路由

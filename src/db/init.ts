@@ -24,6 +24,8 @@ export async function initDatabase(env: Env) {
           refresh_token_expires_at INTEGER,
           role TEXT DEFAULT 'user',
           disabled INTEGER DEFAULT 0,
+          oauth_provider TEXT,
+          oauth_provider_id TEXT,
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL
         )
@@ -88,15 +90,13 @@ export async function initDatabase(env: Env) {
 
       console.log('Database tables created successfully');
     } else {
-      console.log('Database already exists, checking for type column in smtp_configs...');
+      console.log('Database already exists, checking for missing columns...');
 
       // Check if smtp_configs has type column
-      const typeColumn = await env.DB.prepare(
+      const smtpColumns = await env.DB.prepare(
         "PRAGMA table_info(smtp_configs)"
       ).all();
-
-      const hasType = typeColumn.results.some(col => col.name === 'type');
-
+      const hasType = smtpColumns.results.some(col => col.name === 'type');
       if (!hasType) {
         console.log('Adding type column to smtp_configs...');
         await env.DB.prepare(
@@ -104,6 +104,46 @@ export async function initDatabase(env: Env) {
         ).run();
         console.log('Type column added successfully');
       }
+
+      // Check if users has oauth_provider and oauth_provider_id columns
+      const userColumns = await env.DB.prepare(
+        "PRAGMA table_info(users)"
+      ).all();
+      const hasOauthProvider = userColumns.results.some(col => col.name === 'oauth_provider');
+      const hasOauthProviderId = userColumns.results.some(col => col.name === 'oauth_provider_id');
+      
+      if (!hasOauthProvider) {
+        console.log('Adding oauth_provider column to users...');
+        await env.DB.prepare(
+          "ALTER TABLE users ADD COLUMN oauth_provider TEXT"
+        ).run();
+      }
+      if (!hasOauthProviderId) {
+        console.log('Adding oauth_provider_id column to users...');
+        await env.DB.prepare(
+          "ALTER TABLE users ADD COLUMN oauth_provider_id TEXT"
+        ).run();
+      }
+    }
+
+    // Check if oauth_states table exists
+    const oauthStatesTable = await env.DB.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='oauth_states'"
+    ).first();
+
+    if (!oauthStatesTable) {
+      console.log('Creating oauth_states table...');
+      await env.DB.prepare(`
+        CREATE TABLE oauth_states (
+          id TEXT PRIMARY KEY,
+          state TEXT NOT NULL UNIQUE,
+          user_id TEXT,
+          redirect_uri TEXT NOT NULL,
+          expires_at INTEGER NOT NULL,
+          created_at TEXT NOT NULL
+        )
+      `).run();
+      console.log('oauth_states table created successfully');
     }
 
     console.log('Database initialization completed');

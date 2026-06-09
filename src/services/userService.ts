@@ -8,6 +8,37 @@ export class UserService {
     this.env = env;
   }
 
+  async createOAuthUser(email: string, provider: string, providerUserId: string): Promise<User> {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const isAdmin = email === this.env.ADMIN_EMAIL;
+
+    await this.env.DB.prepare(
+      'INSERT INTO users (id, email, password, role, oauth_provider, oauth_provider_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    )
+      .bind(id, email, '', isAdmin ? 'admin' : 'user', provider, providerUserId, now, now)
+      .run();
+
+    return this.findById(id) as Promise<User>;
+  }
+
+  async generateToken(userId: string): Promise<{ token: UserToken }> {
+    const token = generateToken();
+    const refreshToken = generateToken();
+    const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+    const refreshExpiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
+
+    await this.env.DB.prepare(
+      'UPDATE users SET token = ?, token_expires_at = ?, refresh_token = ?, refresh_token_expires_at = ?, updated_at = ? WHERE id = ?'
+    )
+      .bind(token, expiresAt, refreshToken, refreshExpiresAt, new Date().toISOString(), userId)
+      .run();
+
+    return {
+      token: { token, refreshToken, expiresAt }
+    };
+  }
+
   async register(email: string, password: string): Promise<User> {
     const existing = await this.findByEmail(email);
     if (existing) {

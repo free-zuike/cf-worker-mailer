@@ -146,6 +146,28 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // 设置 token（用于 OAuth）
+  function setToken(tokenStr: string, refreshTokenStr: string, expiresAt: number) {
+    token.value = {
+      token: tokenStr,
+      refreshToken: refreshTokenStr,
+      expiresAt
+    };
+    saveSession();
+  }
+
+  // 获取用户信息
+  async function fetchUser() {
+    try {
+      const response = await api.get('/auth/me');
+      user.value = response.user;
+      saveSession();
+    } catch (e) {
+      console.error('Failed to fetch user:', e);
+      logout();
+    }
+  }
+
   // 登出
   function logout() {
     clearSession();
@@ -164,6 +186,8 @@ export const useAuthStore = defineStore('auth', () => {
     refreshToken,
     login,
     register,
-    logout
+    logout,
+    setToken,
+    fetchUser
   };
 });

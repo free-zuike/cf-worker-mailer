@@ -76,6 +76,41 @@ export interface UpdateSmtpConfigRequest {
   enabled?: boolean;
 }
 
+// ==================== OAuth 相关类型 ====================
+export interface OAuthProvider {
+  id: string;
+  name: string;
+  clientId: string;
+  clientSecret: string;
+  scopes: string[];
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OAuthState {
+  id: string;
+  state: string;
+  userId?: string;
+  redirectUri: string;
+  expiresAt: number;
+  createdAt: string;
+}
+
+export interface OAuthCallbackRequest {
+  code: string;
+  state: string;
+}
+
+export interface OAuthTokenResponse {
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt: number;
+  provider: string;
+  providerUserId: string;
+  email: string;
+}
+
 // ==================== 邮件模板相关类型 ====================
 export interface EmailTemplate {
   id: string;
@@ -191,4 +226,9 @@ export interface Env {
   ADMIN_PASSWORD?: string;
   ADMIN_EMAIL?: string;
   ALLOWED_ORIGINS?: string;
+  // OAuth 配置
+  GITHUB_CLIENT_ID?: string;
+  GITHUB_CLIENT_SECRET?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
 }
