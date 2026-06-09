@@ -71,16 +71,16 @@
               </div>
 
               <div class="form-group">
-                <label>提供商类型</label>
-                <select v-model="(provider as any).type" class="form-input">
-                  <option value="github">GitHub</option>
-                  <option value="google">Google</option>
-                  <option value="discord">Discord</option>
-                  <option value="oidc">通用 OIDC</option>
-                </select>
+                <label>提供商名称 (仅显示用)</label>
+                <input
+                  v-model="provider.label"
+                  type="text"
+                  class="form-input"
+                  placeholder="My OpenAuth Provider"
+                />
               </div>
 
-              <div v-if="(provider as any).type === 'oidc'" class="form-group">
+              <div class="form-group">
                 <label>Issuer URL (发现端点)</label>
                 <input
                   v-model="(provider as any).issuer"
@@ -116,7 +116,7 @@
                   v-model="scopesText[index]"
                   type="text"
                   class="form-input"
-                  :placeholder="getDefaultScopes((provider as any).type)"
+                  placeholder="openid email profile"
                 />
               </div>
 
@@ -126,8 +126,8 @@
               </div>
             </div>
             <p class="help-text">
-              在对应平台创建 OAuth App 后填入信息。回调地址需设置为你部署的 Worker 访问地址 +
-              <code>/api/oauth/callback</code>
+              通用 OIDC / OpenAuth 配置。在你的 OpenAuth 控制台创建 OAuth App，将 Issuer、Client
+              ID、Client Secret 填入。回调地址需配置为部署地址 + <code>/api/oauth/callback</code>
             </p>
           </div>
         </div>
@@ -193,35 +193,8 @@ const defaultSettings: Settings = {
   oauthEnabled: false,
   oauthProviders: [
     {
-      name: 'github',
-      label: 'GitHub',
-      enabled: false,
-      clientId: '',
-      clientSecret: '',
-      type: 'github',
-      scopes: ['read:user', 'user:email']
-    },
-    {
-      name: 'google',
-      label: 'Google',
-      enabled: false,
-      clientId: '',
-      clientSecret: '',
-      type: 'google',
-      scopes: ['openid', 'email', 'profile']
-    },
-    {
-      name: 'discord',
-      label: 'Discord',
-      enabled: false,
-      clientId: '',
-      clientSecret: '',
-      type: 'discord',
-      scopes: ['identify', 'email']
-    },
-    {
-      name: 'oidc',
-      label: '通用 OIDC',
+      name: 'openauth',
+      label: 'OpenAuth',
       enabled: false,
       clientId: '',
       clientSecret: '',
@@ -252,21 +225,6 @@ const callbackUrl = computed(() => {
   return `${base}/api/oauth/callback`;
 });
 
-function getDefaultScopes(type: string): string {
-  switch (type) {
-    case 'github':
-      return 'read:user user:email';
-    case 'google':
-      return 'openid email profile';
-    case 'discord':
-      return 'identify email';
-    case 'oidc':
-      return 'openid email profile';
-    default:
-      return '';
-  }
-}
-
 async function loadSettings() {
   try {
     const result = await api.get<{ settings: Settings }>('/settings');
@@ -288,7 +246,7 @@ async function loadSettings() {
 
       // 把 scopes 数组转字符串用于 UI 编辑
       settings.value.oauthProviders.forEach((p, index) => {
-        scopesText[index] = p.scopes?.join(' ') || getDefaultScopes(p.type || 'oidc');
+        scopesText[index] = p.scopes?.join(' ') || 'openid email profile';
       });
     }
   } catch (e) {
@@ -329,25 +287,6 @@ async function saveSettings() {
     saving.value = false;
   }
 }
-
-// 监听 provider type 变化，重置 label
-watch(
-  () => settings.value.oauthProviders.map(p => p.type),
-  (types) => {
-    types.forEach((type, index) => {
-      if (type === 'github' && !settings.value.oauthProviders[index].label?.includes('Git')) {
-        settings.value.oauthProviders[index].label = 'GitHub';
-      }
-      if (type === 'google' && !settings.value.oauthProviders[index].label?.includes('Goo')) {
-        settings.value.oauthProviders[index].label = 'Google';
-      }
-      if (type === 'discord' && !settings.value.oauthProviders[index].label?.includes('Dis')) {
-        settings.value.oauthProviders[index].label = 'Discord';
-      }
-    });
-  },
-  { deep: true }
-);
 
 onMounted(() => {
   loadSettings();

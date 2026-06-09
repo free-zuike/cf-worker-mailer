@@ -1,5 +1,4 @@
 import type { Env } from '../../types';
-import { decrypt } from '../utils/crypto';
 
 export interface OAuthProviderConfig {
   name: string;
@@ -8,35 +7,16 @@ export interface OAuthProviderConfig {
   clientId: string;
   clientSecret: string;
   scopes?: string[];
-  // OpenAuth 提供商类型
-  type: 'github' | 'google' | 'oidc' | 'discord' | 'facebook' | 'twitter' | 'azure-ad';
-  // OIDC 发现端点
+  type: 'oidc';
   issuer?: string;
 }
 
-// OpenAuth 提供商配置描述
-export const PROVIDER_PRESETS: Record<string, { label: string; type: OAuthProviderConfig['type']; defaultScopes: string[] }> = {
-  github: {
-    label: 'GitHub',
-    type: 'github',
-    defaultScopes: ['read:user', 'user:email']
-  },
-  google: {
-    label: 'Google',
-    type: 'google',
-    defaultScopes: ['openid', 'email', 'profile']
-  },
-  discord: {
-    label: 'Discord',
-    type: 'discord',
-    defaultScopes: ['identify', 'email']
-  },
-  oidc: {
-    label: '通用 OIDC',
-    type: 'oidc',
-    defaultScopes: ['openid', 'email', 'profile']
-  }
-};
+// 解析 /.well-known/openid-configuration 返回的端点
+interface OpenIdDiscovery {
+  authorization_endpoint: string;
+  token_endpoint: string;
+  userinfo_endpoint?: string;
+}
 
 export class OAuthService {
   private env: Env;
@@ -45,30 +25,33 @@ export class OAuthService {
     this.env = env;
   }
 
-  async createState(redirectUri: string, provider: string): Promise<{ state: string; codeVerifier: string }> {
+  async createState(
+    redirectUri: string,
+    provider: string
+  ): Promise<{ state: string; codeVerifier: string }> {
     const state = crypto.randomUUID();
     const codeVerifier = this.generateCodeVerifier();
     const expiresAt = Date.now() + 10 * 60 * 1000;
 
     await this.env.DB.prepare(
       'INSERT INTO oauth_states (id, state, user_id, redirect_uri, provider, code_verifier, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-    )
-      .bind(
-        crypto.randomUUID(),
-        state,
-        null,
-        redirectUri,
-        provider,
-        codeVerifier,
-        expiresAt,
-        new Date().toISOString()
-      )
-      .run();
+    ).bind(
+      crypto.randomUUID(),
+      state,
+      null,
+      redirectUri,
+      provider,
+      codeVerifier,
+      expiresAt,
+      new Date().toISOString()
+    ).run();
 
     return { state, codeVerifier };
   }
 
-  async getState(state: string): Promise<{ redirectUri: string; provider: string; codeVerifier: string } | null> {
+  async getState(
+    state: string
+  ): Promise<{ redirectUri: string; provider: string; codeVerifier: string } | null> {
     const row = await this.env.DB.prepare(
       'SELECT redirect_uri, provider, code_verifier FROM oauth_states WHERE state = ? AND expires_at > ?'
     ).bind(state, Date.now()).first<{
@@ -82,77 +65,37 @@ export class OAuthService {
   }
 
   async deleteState(state: string): Promise<void> {
-    await this.env.DB.prepare(
-      'DELETE FROM oauth_states WHERE state = ?'
-    ).bind(state).run();
+    await this.env.DB.prepare('DELETE FROM oauth_states WHERE state = ?').bind(state).run();
   }
 
-  async getAuthorizeUrl(providerConfig: OAuthProviderConfig, redirectUri: string): Promise<string> {
-    const { state, codeVerifier } = await this.createState(redirectUri, providerConfig.name);
-
-    const baseUrl = new URL(redirectUri).origin;
-    const callbackUrl = `${baseUrl}/api/oauth/callback`;
-
-    if (providerConfig.type === 'github') {
-      const params = new URLSearchParams({
-        client_id: providerConfig.clientId,
-        redirect_uri: callbackUrl,
-        state,
-        scope: providerConfig.scopes?.join(' ') || 'read:user user:email',
-        code_challenge_method: 'S256',
-        code_challenge: this.generateCodeChallenge(codeVerifier)
-      });
-      return `https://github.com/login/oauth/authorize?${params.toString()}`;
+  async getAuthorizeUrl(
+    providerConfig: OAuthProviderConfig,
+    redirectUri: string
+  ): Promise<string> {
+    if (!providerConfig.issuer) {
+      throw new Error('OIDC provider requires issuer URL');
     }
 
-    if (providerConfig.type === 'google') {
-      const params = new URLSearchParams({
-        client_id: providerConfig.clientId,
-        redirect_uri: callbackUrl,
-        response_type: 'code',
-        scope: providerConfig.scopes?.join(' ') || 'openid email profile',
-        state,
-        access_type: 'online',
-        prompt: 'select_account',
-        code_challenge_method: 'S256',
-        code_challenge: this.generateCodeChallenge(codeVerifier)
-      });
-      return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-    }
+    const { state } = await this.createState(redirectUri, providerConfig.name);
+    const codeChallenge = this.generateCodeChallenge(await this.getCodeVerifierForState(state));
 
-    if (providerConfig.type === 'discord') {
-      const params = new URLSearchParams({
-        client_id: providerConfig.clientId,
-        redirect_uri: callbackUrl,
-        response_type: 'code',
-        scope: providerConfig.scopes?.join(' ') || 'identify email',
-        state,
-        code_challenge_method: 'S256',
-        code_challenge: this.generateCodeChallenge(codeVerifier)
-      });
-      return `https://discord.com/api/oauth2/authorize?${params.toString()}`;
-    }
+    // 从 discovery endpoint 获取授权端点（也可以直接用 issuer + /oauth/authorize）
+    const discovery = await this.fetchDiscovery(providerConfig.issuer);
+    const authEndpoint = discovery.authorization_endpoint;
 
-    if (providerConfig.type === 'oidc' && providerConfig.issuer) {
-      // 从 .well-known/openid-configuration 获取授权端点
-      const wellKnown = await fetch(`${providerConfig.issuer.replace(/\/$/, '')}/.well-known/openid-configuration`);
-      const metadata = await wellKnown.json();
-      const authEndpoint = metadata.authorization_endpoint;
+    const callbackUrl = `${new URL(redirectUri).origin}/api/oauth/callback`;
 
-      const params = new URLSearchParams({
-        client_id: providerConfig.clientId,
-        redirect_uri: callbackUrl,
-        response_type: 'code',
-        scope: providerConfig.scopes?.join(' ') || 'openid email profile',
-        state,
-        code_challenge_method: 'S256',
-        code_challenge: this.generateCodeChallenge(codeVerifier)
-      });
+    const params = new URLSearchParams({
+      client_id: providerConfig.clientId,
+      redirect_uri: callbackUrl,
+      response_type: 'code',
+      scope: providerConfig.scopes?.join(' ') || 'openid email profile',
+      state,
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256'
+    });
 
-      return `${authEndpoint}?${params.toString()}`;
-    }
-
-    throw new Error(`Unsupported provider type: ${providerConfig.type}`);
+    return `${authEndpoint}?${params.toString()}`;
   }
 
   async exchangeCode(
@@ -161,135 +104,89 @@ export class OAuthService {
     redirectUri: string,
     codeVerifier: string
   ): Promise<{ email: string; providerUserId: string }> {
+    if (!providerConfig.issuer) {
+      throw new Error('OIDC provider requires issuer URL');
+    }
+
     const baseUrl = new URL(redirectUri).origin;
     const callbackUrl = `${baseUrl}/api/oauth/callback`;
 
-    let tokenEndpoint = '';
-    let userInfoEndpoint = '';
-    let accessToken = '';
+    const discovery = await this.fetchDiscovery(providerConfig.issuer);
+    const tokenEndpoint = discovery.token_endpoint;
 
-    // 根据类型处理
-    if (providerConfig.type === 'github') {
-      const res = await fetch('https://github.com/login/oauth/access_token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json'
-        },
-        body: JSON.stringify({
-          client_id: providerConfig.clientId,
-          client_secret: providerConfig.clientSecret,
-          code,
-          redirect_uri: callbackUrl,
-          code_verifier: codeVerifier
-        })
+    // 交换 access token
+    const tokenResponse = await fetch(tokenEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: providerConfig.clientId,
+        client_secret: providerConfig.clientSecret,
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: callbackUrl,
+        code_verifier: codeVerifier
+      })
+    });
+
+    if (!tokenResponse.ok) {
+      const text = await tokenResponse.text();
+      throw new Error(`Token exchange failed: ${tokenResponse.status} ${text}`);
+    }
+
+    const tokenData = await tokenResponse.json();
+    const accessToken = tokenData.access_token;
+
+    // 优先走 userinfo endpoint
+    let email = '';
+    let providerUserId = '';
+
+    if (discovery.userinfo_endpoint) {
+      const userResponse = await fetch(discovery.userinfo_endpoint, {
+        headers: { Authorization: `Bearer ${accessToken}` }
       });
-      const tokenData = await res.json();
-      accessToken = tokenData.access_token;
 
-      const userRes = await fetch('https://api.github.com/user', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          Accept: 'application/json'
-        }
-      });
-      const user = await userRes.json();
-
-      // 获取邮箱（如果 user 里已经有就用）
-      let email = user.email;
-      if (!email) {
-        const emailsRes = await fetch('https://api.github.com/user/emails', {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            Accept: 'application/json'
-          }
-        });
-        const emails = await emailsRes.json();
-        const primary = emails.find((e: { primary: boolean; verified: boolean; email: string }) => e.primary && e.verified);
-        email = primary?.email || emails[0]?.email;
+      if (userResponse.ok) {
+        const user = await userResponse.json();
+        email = user.email;
+        providerUserId = user.sub || user.id || user.user_id || '';
       }
-
-      return { email, providerUserId: user.id.toString() };
     }
 
-    if (providerConfig.type === 'google') {
-      const res = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          client_id: providerConfig.clientId,
-          client_secret: providerConfig.clientSecret,
-          code,
-          grant_type: 'authorization_code',
-          redirect_uri: callbackUrl,
-          code_verifier: codeVerifier
-        })
-      });
-      const tokenData = await res.json();
-      accessToken = tokenData.access_token;
-
-      const userRes = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-      const user = await userRes.json();
-
-      return { email: user.email, providerUserId: user.sub };
+    // 若从 userinfo 拿不到，则尝试从 id_token JWT 解码
+    if (!email && tokenData.id_token) {
+      try {
+        const payload = this.decodeJwtPayload(tokenData.id_token);
+        email = payload.email;
+        providerUserId = payload.sub || '';
+      } catch (e) {
+        console.error('Failed to decode id_token:', e);
+      }
     }
 
-    if (providerConfig.type === 'discord') {
-      const res = await fetch('https://discord.com/api/oauth2/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          client_id: providerConfig.clientId,
-          client_secret: providerConfig.clientSecret,
-          grant_type: 'authorization_code',
-          code,
-          redirect_uri: callbackUrl,
-          code_verifier: codeVerifier
-        }).toString()
-      });
-      const tokenData = await res.json();
-      accessToken = tokenData.access_token;
-
-      const userRes = await fetch('https://discord.com/api/users/@me', {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-      const user = await userRes.json();
-
-      return { email: user.email, providerUserId: user.id };
+    if (!email) {
+      throw new Error('Failed to get email from provider');
     }
 
-    if (providerConfig.type === 'oidc' && providerConfig.issuer) {
-      const wellKnown = await fetch(`${providerConfig.issuer.replace(/\/$/, '')}/.well-known/openid-configuration`);
-      const metadata = await wellKnown.json();
-      tokenEndpoint = metadata.token_endpoint;
-      userInfoEndpoint = metadata.userinfo_endpoint;
+    return { email, providerUserId };
+  }
 
-      const res = await fetch(tokenEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          client_id: providerConfig.clientId,
-          client_secret: providerConfig.clientSecret,
-          code,
-          grant_type: 'authorization_code',
-          redirect_uri: callbackUrl,
-          code_verifier: codeVerifier
-        })
-      });
-      const tokenData = await res.json();
-      accessToken = tokenData.access_token;
+  private async getCodeVerifierForState(state: string): Promise<string> {
+    const row = await this.env.DB.prepare(
+      'SELECT code_verifier FROM oauth_states WHERE state = ?'
+    ).bind(state).first<{ code_verifier: string }>();
+    return row?.code_verifier || '';
+  }
 
-      const userRes = await fetch(userInfoEndpoint, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-      const user = await userRes.json();
+  private async fetchDiscovery(issuer: string): Promise<OpenIdDiscovery> {
+    const url = issuer.endsWith('/')
+      ? `${issuer}.well-known/openid-configuration`
+      : `${issuer}/.well-known/openid-configuration`;
 
-      return { email: user.email, providerUserId: user.sub || user.id };
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch OIDC discovery: ${res.status}`);
     }
-
-    throw new Error(`Unsupported provider: ${providerConfig.type}`);
+    return res.json() as Promise<OpenIdDiscovery>;
   }
 
   private generateCodeVerifier(): string {
@@ -307,5 +204,13 @@ export class OAuthService {
   private base64urlEncode(array: Uint8Array): string {
     const base64 = btoa(String.fromCharCode(...array));
     return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  private decodeJwtPayload(token: string): Record<string, any> {
+    const parts = token.split('.');
+    if (parts.length < 2) throw new Error('Invalid JWT');
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const json = atob(base64);
+    return JSON.parse(json);
   }
 }

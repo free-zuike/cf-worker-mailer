@@ -25,20 +25,14 @@ export const defaultSettings: Settings = {
   oauthEnabled: false,
   oauthProviders: [
     {
-      name: 'github',
-      label: 'GitHub',
+      name: 'openauth',
+      label: 'OpenAuth',
       enabled: false,
       clientId: '',
       clientSecret: '',
-      scopes: ['read:user', 'user:email']
-    },
-    {
-      name: 'google',
-      label: 'Google',
-      enabled: false,
-      clientId: '',
-      clientSecret: '',
-      scopes: ['openid', 'email', 'profile']
+      scopes: ['openid', 'email', 'profile'],
+      type: 'oidc',
+      issuer: ''
     }
   ],
   captchaEnabled: false,

@@ -94,11 +94,6 @@ const enabledProviders = computed(() => {
 });
 
 function providerIcon(name: string, type?: string): string {
-  const t = type || name;
-  if (t === 'github') return 'üêç';
-  if (t === 'google') return 'üòê';
-  if (t === 'discord') return 'üï§';
-  if (t === 'oidc') return 'üîê';
   return 'üîê';
 }
 
@@ -356,11 +351,7 @@ form {
   border-color: #d1d5db;
 }
 
-.btn-oauth.github:hover:not(:disabled) {
-  background: #24292e;
-  color: white;
-  border-color: #24292e;
-}
+
 
 .oauth-icon {
   font-size: 18px;
