@@ -23,8 +23,11 @@ onMounted(async () => {
     const expiresAt = urlParams.get('expiresAt');
 
     if (token && refreshToken && expiresAt) {
+      // 设置 token
       authStore.setToken(token, refreshToken, parseInt(expiresAt));
+      // 获取用户信息
       await authStore.fetchUser();
+      // 重定向到首页
       router.push('/');
     } else {
       console.error('OAuth callback missing parameters');

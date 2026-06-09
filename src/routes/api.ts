@@ -7,6 +7,7 @@ import { EmailService } from '../services/emailService';
 import { SettingsService } from '../services/settingsService';
 import { PreferencesService } from '../services/preferencesService';
 import { CaptchaService } from '../services/captchaService';
+import { OAuthService } from '../services/oauthService';
 
 const api = new Hono<{ Bindings: Env; Variables: { user: User } }>();
 
@@ -88,6 +89,74 @@ api.post('/auth/refresh', async (c) => {
     return c.json({ user, token });
   } catch (error) {
     return c.json({ error: 'Invalid refresh token' }, 401);
+  }
+});
+
+// ==================== OAuth Callback 路由 ====================
+api.get('/oauth/callback', async (c) => {
+  try {
+    const code = c.req.query('code');
+    const state = c.req.query('state');
+    const error = c.req.query('error');
+
+    if (error) {
+      return c.redirect(`/login?error=${encodeURIComponent(error)}`, 302);
+    }
+
+    if (!code || !state) {
+      return c.redirect('/login?error=missing_parameters', 302);
+    }
+
+    const oauthService = new OAuthService(c.env);
+    const settingsService = new SettingsService(c.env);
+    const userService = new UserService(c.env);
+
+    // 获取存储的 state 信息
+    const stateData = await oauthService.getState(state);
+    if (!stateData) {
+      return c.redirect('/login?error=invalid_state', 302);
+    }
+
+    // 获取 provider 配置
+    const settings = await settingsService.getSettings();
+    const provider = settings.oauth.providers.find(p => p.name === stateData.provider);
+    if (!provider || !provider.enabled) {
+      return c.redirect('/login?error=provider_disabled', 302);
+    }
+
+    // 交换 code 获取用户信息
+    const { email } = await oauthService.exchangeCode(
+      provider,
+      code,
+      stateData.redirectUri,
+      stateData.codeVerifier
+    );
+
+    // 删除已使用的 state
+    await oauthService.deleteState(state);
+
+    // 查找或创建用户
+    let user = await userService.findByEmail(email);
+    if (!user) {
+      // 创建新用户（随机密码）
+      const randomPassword = crypto.randomUUID();
+      await userService.register(email, randomPassword);
+      user = await userService.findByEmail(email);
+    }
+
+    // 生成 token
+    const { token } = await userService.createToken(user!);
+
+    // 重定向回前端并携带 token
+    const redirectUrl = new URL('/oauth-callback', stateData.redirectUri);
+    redirectUrl.searchParams.set('token', token.token);
+    redirectUrl.searchParams.set('refreshToken', token.refreshToken);
+    redirectUrl.searchParams.set('expiresAt', token.expiresAt.toString());
+
+    return c.redirect(redirectUrl.toString(), 302);
+  } catch (error) {
+    console.error('OAuth callback error:', error);
+    return c.redirect(`/login?error=${encodeURIComponent((error as Error).message)}`, 302);
   }
 });
 

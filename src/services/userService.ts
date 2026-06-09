@@ -64,6 +64,23 @@ export class UserService {
     };
   }
 
+  async createToken(user: User): Promise<{ token: UserToken }> {
+    const token = generateToken();
+    const refreshToken = generateToken();
+    const expiresAt = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+    const refreshExpiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days
+
+    await this.env.DB.prepare(
+      'UPDATE users SET token = ?, token_expires_at = ?, refresh_token = ?, refresh_token_expires_at = ?, updated_at = ? WHERE id = ?'
+    )
+      .bind(token, expiresAt, refreshToken, refreshExpiresAt, new Date().toISOString(), user.id)
+      .run();
+
+    return {
+      token: { token, refreshToken, expiresAt }
+    };
+  }
+
   async refreshToken(refreshToken: string): Promise<{ user: User; token: UserToken }> {
     const userRow = await this.env.DB.prepare(
       'SELECT id, email, role, disabled, refresh_token_expires_at FROM users WHERE refresh_token = ?'
