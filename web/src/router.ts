@@ -15,6 +15,11 @@ const routes = [
     meta: { requiresGuest: true }
   },
   {
+    path: '/oauth-callback',
+    name: 'OAuthCallback',
+    component: () => import('./views/OAuthCallback.vue')
+  },
+  {
     path: '/',
     name: 'Dashboard',
     component: () => import('./views/Dashboard.vue'),
