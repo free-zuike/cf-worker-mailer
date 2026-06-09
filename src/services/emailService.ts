@@ -81,6 +81,24 @@ export class EmailService {
       )
       .run();
 
+    // 优先使用队列异步发送，若队列不可用则回退到同步发送
+    if ((this.env as any).EMAIL_QUEUE) {
+      try {
+        await (this.env as any).EMAIL_QUEUE.send({
+          emailId: id,
+          userId: this.userId
+        });
+        return {
+          id,
+          status: 'pending',
+          createdAt: now
+        };
+      } catch (queueError) {
+        console.warn('Queue unavailable, falling back to sync send:', queueError);
+      }
+    }
+
+    // 同步发送（回退）
     await this.processEmail(id);
     const history = await this.getHistory(id);
     return {

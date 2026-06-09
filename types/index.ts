@@ -186,7 +186,7 @@ export interface EmailMetrics {
 // ==================== 环境类型 ====================
 export interface Env {
   DB: D1Database;
-  MAIL_QUEUE: Queue;
+  EMAIL_QUEUE: Queue;
   ASSETS: { fetch: (request: Request) => Promise<Response> };
   ADMIN_PASSWORD?: string;
   ADMIN_EMAIL?: string;

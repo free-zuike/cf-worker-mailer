@@ -33,6 +33,14 @@ migrations_dir = "migrations"
 # ADMIN_EMAIL = "admin@example.com"
 
 # ------------------------------------------
+# Cloudflare Queues - 邮件异步发送队列
+# ------------------------------------------
+[[queues]]
+binding = "EMAIL_QUEUE"
+queue_name = "cf-worker-mailer-queue"
+max_retries = 3
+
+# ------------------------------------------
 # Workers 日志和监控
 # ------------------------------------------
 [observability]
