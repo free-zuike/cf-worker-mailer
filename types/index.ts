@@ -18,24 +18,6 @@ export interface UserToken {
   expiresAt: number;
 }
 
-// ==================== API 密钥相关类型 ====================
-export interface ApiKey {
-  id: string;
-  userId: string;
-  name: string;
-  scopes?: string[];
-  expiresAt?: number;
-  lastUsedAt?: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateApiKeyRequest {
-  name: string;
-  scopes?: string[];
-  expiresAt?: number;
-}
-
 // ==================== SMTP 配置相关类型 ====================
 export interface SmtpConfig {
   id: string;
@@ -158,22 +140,6 @@ export interface EmailHistory {
   createdAt: string;
 }
 
-// ==================== 域名验证相关类型 ====================
-export interface DomainVerification {
-  id: string;
-  userId: string;
-  domain: string;
-  verificationCode: string;
-  verified: boolean;
-  verifiedAt?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateDomainVerificationRequest {
-  domain: string;
-}
-
 // ==================== 统计相关类型 ====================
 export interface EmailMetrics {
   total: number;
@@ -181,6 +147,39 @@ export interface EmailMetrics {
   failed: number;
   pending: number;
   byDay: Record<string, { total: number; sent: number; failed: number }>;
+}
+
+// ==================== OAuth 提供商配置 ====================
+export interface OAuthProviderConfig {
+  name: string;
+  label: string;
+  enabled: boolean;
+  clientId: string;
+  clientSecret: string;
+  scopes?: string[];
+  issuer?: string;
+}
+
+// ==================== 全局系统设置（管理员修改） ====================
+export interface CaptchaSettings {
+  enabled: boolean;
+  siteKey: string;
+  secretKey: string;
+}
+
+export interface OAuthSettings {
+  enabled: boolean;
+  providers: OAuthProviderConfig[];
+}
+
+export interface SystemSettings {
+  captcha: CaptchaSettings;
+  oauth: OAuthSettings;
+}
+
+// ==================== 用户偏好（每个用户自己改） ====================
+export interface UserPreferences {
+  theme: 'light' | 'dark';
 }
 
 // ==================== 环境类型 ====================
