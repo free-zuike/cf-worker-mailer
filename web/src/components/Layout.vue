@@ -18,14 +18,17 @@
         <router-link to="/history" class="nav-item" active-class="active">
           <span>📜</span> 发送历史
         </router-link>
-        <router-link to="/settings" class="nav-item" active-class="active">
-          <span>🔧</span> 设置
+        <router-link to="/settings" class="nav-item" active-class="active" v-if="authStore.isAdmin">
+          <span>🔧</span> 系统设置
         </router-link>
       </nav>
       
       <div class="sidebar-footer">
         <div class="user-info">
           <span class="user-email">{{ authStore.user?.email }}</span>
+          <span class="user-role" :class="{ admin: authStore.isAdmin }">
+            {{ authStore.isAdmin ? '管理员' : '普通用户' }}
+          </span>
         </div>
         <button @click="handleLogout" class="logout-btn">
           退出登录
@@ -115,6 +118,23 @@ function handleLogout() {
 .user-email {
   font-size: 14px;
   color: rgba(255, 255, 255, 0.8);
+  display: block;
+  word-break: break-all;
+}
+
+.user-role {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.user-role.admin {
+  background: rgba(102, 126, 234, 0.3);
+  color: #a5b4fc;
 }
 
 .logout-btn {

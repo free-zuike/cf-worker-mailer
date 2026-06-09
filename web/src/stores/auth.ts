@@ -34,6 +34,7 @@ export const useAuthStore = defineStore('auth', () => {
   const error = ref<string | null>(null);
 
   const isAuthenticated = computed(() => !!user.value && !!token.value);
+  const isAdmin = computed(() => !!user.value && user.value.role === 'admin');
 
   // 检查 token 是否即将过期（5分钟内）
   function isTokenExpiring(): boolean {
@@ -182,6 +183,7 @@ export const useAuthStore = defineStore('auth', () => {
     loading,
     error,
     isAuthenticated,
+    isAdmin,
     isTokenExpiring,
     refreshToken,
     login,

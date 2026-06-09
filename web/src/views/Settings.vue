@@ -3,6 +3,7 @@
     <div class="settings-page">
       <div class="page-header">
         <h2>系统设置</h2>
+        <p v-if="!isAdmin" class="read-only-banner">您不是管理员，只能查看部分配置。</p>
       </div>
 
       <div class="settings-content">
@@ -10,22 +11,30 @@
         <div class="settings-card">
           <div class="card-header">
             <h3>人机验证</h3>
-            <label class="toggle">
+            <label v-if="isAdmin" class="toggle">
               <input type="checkbox" v-model="settings.captchaEnabled" />
               <span class="toggle-slider"></span>
             </label>
+            <span v-else class="status-badge" :class="settings.captchaEnabled ? 'on' : 'off'">
+              {{ settings.captchaEnabled ? '已启用' : '未启用' }}
+            </span>
           </div>
           <div class="card-body">
             <div class="form-group">
               <label>验证服务</label>
-              <select v-model="settings.captchaProvider" class="form-input">
-                <option value="turnstile">Cloudflare Turnstile</option>
-              </select>
+              <input
+                v-model="settings.captchaProvider"
+                type="text"
+                class="form-input"
+                readonly
+              />
             </div>
             <div class="form-group">
               <label>站点密钥 (Site Key)</label>
               <input
-                v-model="settings.captchaSiteKey"
+                :value="settings.captchaSiteKey"
+                :disabled="!isAdmin"
+                @input="(e) => settings.captchaSiteKey = (e.target as HTMLInputElement).value"
                 type="text"
                 class="form-input"
                 placeholder="1x00000000000000000000AA"
@@ -34,7 +43,9 @@
             <div class="form-group">
               <label>密钥 (Secret Key)</label>
               <input
-                v-model="settings.captchaSecretKey"
+                :value="settings.captchaSecretKey"
+                :disabled="!isAdmin"
+                @input="(e) => settings.captchaSecretKey = (e.target as HTMLInputElement).value"
                 type="password"
                 class="form-input"
                 placeholder="••••••••••••••••"
@@ -51,10 +62,13 @@
         <div class="settings-card">
           <div class="card-header">
             <h3>第三方登录 (OpenAuth)</h3>
-            <label class="toggle">
+            <label v-if="isAdmin" class="toggle">
               <input type="checkbox" v-model="settings.oauthEnabled" />
               <span class="toggle-slider"></span>
             </label>
+            <span v-else class="status-badge" :class="settings.oauthEnabled ? 'on' : 'off'">
+              {{ settings.oauthEnabled ? '已启用' : '未启用' }}
+            </span>
           </div>
           <div class="card-body">
             <div
@@ -64,16 +78,21 @@
             >
               <div class="provider-header">
                 <span class="provider-name">{{ provider.label }}</span>
-                <label class="toggle small">
+                <label v-if="isAdmin" class="toggle small">
                   <input type="checkbox" v-model="provider.enabled" />
                   <span class="toggle-slider"></span>
                 </label>
+                <span v-else class="status-badge" :class="provider.enabled ? 'on' : 'off'">
+                  {{ provider.enabled ? '已启用' : '未启用' }}
+                </span>
               </div>
 
               <div class="form-group">
                 <label>提供商名称 (仅显示用)</label>
                 <input
-                  v-model="provider.label"
+                  :value="provider.label"
+                  :disabled="!isAdmin"
+                  @input="(e) => (provider.label = (e.target as HTMLInputElement).value)"
                   type="text"
                   class="form-input"
                   placeholder="My OpenAuth Provider"
@@ -83,7 +102,9 @@
               <div class="form-group">
                 <label>Issuer URL (发现端点)</label>
                 <input
-                  v-model="(provider as any).issuer"
+                  :value="provider.issuer || ''"
+                  :disabled="!isAdmin"
+                  @input="(e) => (provider.issuer = (e.target as HTMLInputElement).value)"
                   type="text"
                   class="form-input"
                   placeholder="https://your-oidc-provider.com"
@@ -93,27 +114,31 @@
               <div class="form-group">
                 <label>客户端 ID (Client ID)</label>
                 <input
-                  v-model="provider.clientId"
+                  :value="provider.clientId"
+                  :disabled="!isAdmin"
+                  @input="(e) => (provider.clientId = (e.target as HTMLInputElement).value)"
                   type="text"
                   class="form-input"
                   placeholder="your-client-id"
                 />
               </div>
 
-              <div class="form-group">
+              <div v-if="isAdmin" class="form-group">
                 <label>客户端密钥 (Client Secret)</label>
                 <input
-                  v-model="provider.clientSecret"
+                  :value="provider.clientSecret"
+                  @input="(e) => (provider.clientSecret = (e.target as HTMLInputElement).value)"
                   type="password"
                   class="form-input"
                   placeholder="••••••••"
                 />
               </div>
 
-              <div class="form-group">
+              <div v-if="isAdmin" class="form-group">
                 <label>作用域 (Scopes，空格分隔)</label>
                 <input
-                  v-model="scopesText[index]"
+                  :value="scopesText[index]"
+                  @input="(e) => (scopesText[index] = (e.target as HTMLInputElement).value)"
                   type="text"
                   class="form-input"
                   placeholder="openid email profile"
@@ -126,13 +151,13 @@
               </div>
             </div>
             <p class="help-text">
-              通用 OIDC / OpenAuth 配置。在你的 OpenAuth 控制台创建 OAuth App，将 Issuer、Client
-              ID、Client Secret 填入。回调地址需配置为部署地址 + <code>/api/oauth/callback</code>
+              通用 OIDC / OpenAuth 配置。在你的 OpenAuth / OAuth2 控制台创建客户端，将 Issuer、Client
+              ID、Client Secret 填入。回调地址为部署地址 + <code>/api/oauth/callback</code>。
             </p>
           </div>
         </div>
 
-        <!-- 主题设置 -->
+        <!-- 主题 -->
         <div class="settings-card">
           <div class="card-header">
             <h3>主题</h3>
@@ -140,7 +165,12 @@
           <div class="card-body">
             <div class="form-group">
               <label>主题</label>
-              <select v-model="settings.theme" class="form-input">
+              <select
+                :value="settings.theme"
+                :disabled="!isAdmin"
+                @change="(e) => (settings.theme = (e.target as HTMLSelectElement).value as 'light' | 'dark')"
+                class="form-input"
+              >
                 <option value="light">浅色</option>
                 <option value="dark">深色</option>
               </select>
@@ -148,7 +178,7 @@
           </div>
         </div>
 
-        <div class="actions">
+        <div v-if="isAdmin" class="actions">
           <button @click="saveSettings" :disabled="saving" class="btn-primary">
             {{ saving ? '保存中...' : '保存设置' }}
           </button>
@@ -162,9 +192,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed, watch } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import Layout from '../components/Layout.vue';
 import { api } from '../api';
+import { useAuthStore } from '../stores/auth';
 import { showToast } from '../utils/toast';
 
 interface OAuthProviderConfig {
@@ -211,19 +242,19 @@ const defaultSettings: Settings = {
   updatedAt: ''
 };
 
-const settings = ref<Settings>({ ...defaultSettings });
-const scopesText = reactive<string[]>(defaultSettings.oauthProviders.map(() => ''));
+const authStore = useAuthStore();
+const isAdmin = computed(() => authStore.isAdmin);
+
+const settings = ref<Settings>({ ...defaultSettings, oauthProviders: [...defaultSettings.oauthProviders.map(p => ({ ...p }))] });
+const scopesText = reactive<string[]>(settings.value.oauthProviders.map(() => ''));
 const saving = ref(false);
 const saveMessage = ref('');
 const saveMessageClass = computed(() => ({
-  'success': saveMessage.value && !saveMessage.value.includes('失败'),
-  'error': saveMessage.value && saveMessage.value.includes('失败')
+  success: saveMessage.value && !saveMessage.value.includes('失败'),
+  error: saveMessage.value && saveMessage.value.includes('失败')
 }));
 
-const callbackUrl = computed(() => {
-  const base = window.location.origin;
-  return `${base}/api/oauth/callback`;
-});
+const callbackUrl = computed(() => `${window.location.origin}/api/oauth/callback`);
 
 async function loadSettings() {
   try {
@@ -232,22 +263,24 @@ async function loadSettings() {
       settings.value = {
         ...defaultSettings,
         ...result.settings,
-        oauthProviders: defaultSettings.oauthProviders.map(defaultProvider => {
-          const saved = result.settings.oauthProviders?.find(
-            (p: OAuthProviderConfig) => p.name === defaultProvider.name
-          );
-          const merged: OAuthProviderConfig = {
-            ...defaultProvider,
-            ...saved
-          };
-          return merged;
-        })
+        oauthProviders: result.settings.oauthProviders?.length
+          ? result.settings.oauthProviders.map(p => ({
+              name: p.name || 'openauth',
+              label: p.label || 'OpenAuth',
+              enabled: !!p.enabled,
+              clientId: p.clientId || '',
+              clientSecret: p.clientSecret || '',
+              scopes: p.scopes?.length ? p.scopes : ['openid', 'email', 'profile'],
+              type: (p.type as string) || 'oidc',
+              issuer: p.issuer || ''
+            }))
+          : defaultSettings.oauthProviders.map(p => ({ ...p }))
       };
 
-      // 把 scopes 数组转字符串用于 UI 编辑
-      settings.value.oauthProviders.forEach((p, index) => {
-        scopesText[index] = p.scopes?.join(' ') || 'openid email profile';
-      });
+      // 初始化 scopes 文本输入
+      scopesText.splice(0, scopesText.length, ...settings.value.oauthProviders.map(
+        p => (p as any).scopes?.join(' ') || 'openid email profile'
+      ));
     }
   } catch (e) {
     console.error('Failed to load settings:', e);
@@ -259,14 +292,13 @@ async function saveSettings() {
   saveMessage.value = '';
 
   try {
-    // 合并 scopes 文本为数组
     const toSave: Settings = {
       ...settings.value,
       oauthProviders: settings.value.oauthProviders.map((p, index) => ({
         ...p,
         scopes: scopesText[index]
           ? scopesText[index].split(/\s+/).filter(Boolean)
-          : p.scopes || []
+          : p.scopes || ['openid', 'email', 'profile']
       })),
       updatedAt: new Date().toISOString()
     };
@@ -275,7 +307,6 @@ async function saveSettings() {
     saveMessage.value = '✓ 设置已保存';
     showToast('设置已保存', 'success');
 
-    // 3 秒后清除提示
     setTimeout(() => {
       saveMessage.value = '';
     }, 3000);
@@ -304,6 +335,16 @@ onMounted(() => {
   margin-bottom: 24px;
   padding-bottom: 16px;
   border-bottom: 1px solid #e1e5eb;
+}
+
+.page-header h2 {
+  margin: 0 0 8px 0;
+}
+
+.read-only-banner {
+  margin: 0;
+  color: #f59e0b;
+  font-size: 14px;
 }
 
 .settings-content {
@@ -359,12 +400,19 @@ onMounted(() => {
   border-radius: 8px;
   font-size: 14px;
   transition: border-color 0.2s;
+  background: #fff;
 }
 
 .form-input:focus {
   outline: none;
   border-color: #667eea;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-input:disabled {
+  background: #f9fafb;
+  color: #6b7280;
+  cursor: not-allowed;
 }
 
 .help-text {
@@ -431,6 +479,23 @@ onMounted(() => {
 
 .toggle.small input:checked + .toggle-slider:before {
   transform: translateX(18px);
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.status-badge.on {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.status-badge.off {
+  background: #f3f4f6;
+  color: #6b7280;
 }
 
 .provider-section {

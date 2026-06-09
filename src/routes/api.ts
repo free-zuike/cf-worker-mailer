@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { Env, User, Settings } from '../../types';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware, adminMiddleware } from '../middleware/auth';
 import { UserService } from '../services/userService';
 import { SmtpService } from '../services/smtpService';
 import { EmailService } from '../services/emailService';
@@ -13,22 +13,23 @@ const api = new Hono<{ Bindings: Env; Variables: { user: User } }>();
 // ==================== 获取公共设置（无需登录） ====================
 api.get('/settings/public', async (c) => {
   try {
-    // 返回公共配置（不包含 secret）
-    const settings = new SettingsService(c.env, 'public').getSettings();
-    
+    const settings = await new SettingsService(c.env).getSettings();
+
     return c.json({
-      oauthEnabled: (await settings).oauthEnabled,
-      oauthProviders: (await settings).oauthProviders
+      oauthEnabled: settings.oauthEnabled,
+      oauthProviders: settings.oauthProviders
         .filter(p => p.enabled && p.clientId)
         .map(p => ({
           name: p.name,
           label: p.label,
           enabled: p.enabled,
-          clientId: p.clientId
+          clientId: p.clientId,
+          type: (p as any).type || 'oidc',
+          issuer: (p as any).issuer || ''
         })),
-      captchaEnabled: (await settings).captchaEnabled,
-      captchaProvider: (await settings).captchaProvider,
-      captchaSiteKey: (await settings).captchaSiteKey
+      captchaEnabled: settings.captchaEnabled,
+      captchaProvider: settings.captchaProvider,
+      captchaSiteKey: settings.captchaSiteKey
     });
   } catch (error) {
     return c.json({ error: 'Failed to get settings' }, 500);
@@ -46,12 +47,12 @@ api.post('/auth/register', async (c) => {
     }
 
     // 检查是否需要人机验证
-    const settings = await new SettingsService(c.env, 'public').getSettings();
+    const settings = await new SettingsService(c.env).getSettings();
     if (settings.captchaEnabled && settings.captchaSecretKey) {
       if (!captchaToken) {
         return c.json({ error: 'Captcha verification required' }, 400);
       }
-      const captchaService = new CaptchaService(c.env, 'public', settings.captchaSecretKey);
+      const captchaService = new CaptchaService(c.env, settings.captchaSecretKey);
       const valid = await captchaService.verify(captchaToken);
       if (!valid) {
         return c.json({ error: 'Captcha verification failed' }, 400);
@@ -82,12 +83,12 @@ api.post('/auth/login', async (c) => {
     }
 
     // 检查是否需要人机验证
-    const settings = await new SettingsService(c.env, 'public').getSettings();
+    const settings = await new SettingsService(c.env).getSettings();
     if (settings.captchaEnabled && settings.captchaSecretKey) {
       if (!captchaToken) {
         return c.json({ error: 'Captcha verification required' }, 400);
       }
-      const captchaService = new CaptchaService(c.env, 'public', settings.captchaSecretKey);
+      const captchaService = new CaptchaService(c.env, settings.captchaSecretKey);
       const valid = await captchaService.verify(captchaToken);
       if (!valid) {
         return c.json({ error: 'Captcha verification failed' }, 400);
@@ -106,7 +107,7 @@ api.post('/auth/login', async (c) => {
 // ==================== OAuth 路由（使用通用 OpenAuth 实现，从用户设置读取） ====================
 api.get('/oauth/providers', async (c) => {
   try {
-    const settings = await new SettingsService(c.env, 'public').getSettings();
+    const settings = await new SettingsService(c.env).getSettings();
     const providers = settings.oauthProviders
       .filter(p => p.enabled && p.clientId)
       .map(p => ({
@@ -131,7 +132,7 @@ api.get('/oauth/authorize', async (c) => {
       return c.json({ error: 'provider and redirect_uri are required' }, 400);
     }
 
-    const settings = await new SettingsService(c.env, 'public').getDecryptedSettings();
+    const settings = await new SettingsService(c.env).getDecryptedSettings();
     const providerConfig = settings.oauthProviders.find(p => p.name === provider) as any;
 
     if (!providerConfig || !providerConfig.enabled || !providerConfig.clientId || !providerConfig.clientSecret) {
@@ -182,7 +183,7 @@ api.get('/oauth/callback', async (c) => {
     await oauthService.deleteState(state);
 
     // 获取对应 provider 的配置
-    const settings = await new SettingsService(c.env, 'public').getDecryptedSettings();
+    const settings = await new SettingsService(c.env).getDecryptedSettings();
     const providerConfig = settings.oauthProviders.find(p => p.name === provider) as any;
 
     if (!providerConfig || !providerConfig.clientId || !providerConfig.clientSecret) {
@@ -258,27 +259,38 @@ api.get('/auth/me', (c) => {
   return c.json({ user });
 });
 
-// ==================== 设置路由 ====================
+// ==================== 设置路由（全局系统设置，写入需要管理员权限） ====================
+// 读取设置（任何已登录用户可读（不包含 secret）
 api.get('/settings', async (c) => {
   const user = c.get('user');
-  const settingsService = new SettingsService(c.env, user.id);
+  const settingsService = new SettingsService(c.env);
   const settings = await settingsService.getSettings();
-  return c.json({ settings });
+
+  // 管理员返回解密后的完整配置（能看到 Secret），普通用户返回脱敏版本
+  if (user.role === 'admin') {
+    return c.json({ settings: await settingsService.getDecryptedSettings() });
+  }
+
+  return c.json({
+    settings: {
+      ...settings,
+      captchaSecretKey: '',
+      oauthProviders: settings.oauthProviders.map(p => ({
+        ...p,
+        clientSecret: ''
+      }))
+    }
+  });
 });
 
-api.put('/settings', async (c) => {
+// 修改设置：只有管理员
+api.put('/settings', adminMiddleware, async (c) => {
   const user = c.get('user');
   const body = await c.req.json();
   const settings = body.settings as Settings;
 
-  const settingsService = new SettingsService(c.env, user.id);
-  await settingsService.saveSettings({
-    ...defaultSettings,
-    ...settings,
-    updatedAt: new Date().toISOString()
-  });
-
-  const updated = await settingsService.getSettings();
+  const settingsService = new SettingsService(c.env);
+  const updated = await settingsService.saveSettings(settings, true);
   return c.json({ settings: updated });
 });
 

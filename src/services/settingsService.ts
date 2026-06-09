@@ -1,17 +1,6 @@
 import type { Env } from '../../types';
 import { encrypt, decrypt } from '../utils/crypto';
 
-export interface Settings {
-  oauthEnabled: boolean;
-  oauthProviders: OAuthProviderConfig[];
-  captchaEnabled: boolean;
-  captchaProvider: 'turnstile' | 'recaptcha';
-  captchaSiteKey?: string;
-  captchaSecretKey?: string;
-  theme: 'light' | 'dark';
-  updatedAt: string;
-}
-
 export interface OAuthProviderConfig {
   name: string;
   label: string;
@@ -19,8 +8,22 @@ export interface OAuthProviderConfig {
   clientId: string;
   clientSecret: string;
   scopes?: string[];
+  type: 'oidc';
+  issuer?: string;
 }
 
+export interface Settings {
+  oauthEnabled: boolean;
+  oauthProviders: OAuthProviderConfig[];
+  captchaEnabled: boolean;
+  captchaProvider: 'turnstile';
+  captchaSiteKey: string;
+  captchaSecretKey: string;
+  theme: 'light' | 'dark';
+  updatedAt: string;
+}
+
+// 系统级默认值
 export const defaultSettings: Settings = {
   oauthEnabled: false,
   oauthProviders: [
@@ -30,8 +33,8 @@ export const defaultSettings: Settings = {
       enabled: false,
       clientId: '',
       clientSecret: '',
-      scopes: ['openid', 'email', 'profile'],
       type: 'oidc',
+      scopes: ['openid', 'email', 'profile'],
       issuer: ''
     }
   ],
@@ -43,119 +46,123 @@ export const defaultSettings: Settings = {
   updatedAt: new Date().toISOString()
 };
 
+// settings key 固定为 `system`，代表全局系统设置
+const SYSTEM_SETTINGS_KEY = 'system';
+
 export class SettingsService {
   private env: Env;
-  private userId: string;
 
-  constructor(env: Env, userId: string) {
+  constructor(env: Env) {
     this.env = env;
-    this.userId = userId;
   }
 
   async getSettings(): Promise<Settings> {
     try {
       const row = await this.env.DB.prepare(
-        'SELECT settings FROM user_settings WHERE user_id = ?'
-      ).bind(this.userId).first<{ settings: string }>();
+        'SELECT settings FROM system_settings WHERE settings_key = ?'
+      ).bind(SYSTEM_SETTINGS_KEY).first<{ settings: string }>();
 
       if (row) {
         const parsed = JSON.parse(row.settings) as Settings;
-        return {
-          ...defaultSettings,
-          ...parsed,
-          oauthProviders: defaultSettings.oauthProviders.map(defaultProvider => ({
-            ...defaultProvider,
-            ...parsed.oauthProviders?.find((pp: OAuthProviderConfig) => pp.name === defaultProvider.name)
-          }))
-        };
+        return this.mergeDefaults(parsed);
       }
-
-      return { ...defaultSettings };
     } catch (e) {
-      return { ...defaultSettings };
+      console.warn('Failed to load settings, using defaults', e);
     }
+    return { ...defaultSettings };
   }
 
-  async saveSettings(settings: Settings): Promise<void> {
-    const now = new Date().toISOString();
-    settings.updatedAt = now;
-
-    // 获取现有设置（用于保留已有加密的 secret）
-    const existing = await this.getSettings();
-
-    // 判断一个字符串是否看起来是已加密的（base64 或特定格式）
-    const looksEncrypted = (val: string): boolean => {
-      return !!val && (val.includes('::') || val.startsWith('eyJ') || (val.length > 30 && /^[A-Za-z0-9+/=]+$/.test(val)));
-    };
-
-    // 处理 OAuth providers
-    const processedProviders = await Promise.all(
-      settings.oauthProviders.map(async (provider) => {
-        const existingProvider = existing.oauthProviders?.find(p => p.name === provider.name);
-        
-        let secret = provider.clientSecret;
-        
-        if (!secret || secret.trim() === '') {
-          // 用户未输入新 secret，保留原有值
-          secret = existingProvider?.clientSecret || '';
-        } else if (!looksEncrypted(secret)) {
-          // 用户输入了新的明文 secret，加密它
-          secret = await encrypt(secret);
-        }
-        // 否则 secret 已经是加密的（从前端直接传回来的旧值）
-        
-        return {
-          ...provider,
-          clientSecret: secret
-        };
-      })
-    );
-
-    // 处理 captchaSecretKey
-    let captchaSecret = settings.captchaSecretKey || '';
-    if (!captchaSecret) {
-      captchaSecret = existing.captchaSecretKey || '';
-    } else if (!looksEncrypted(captchaSecret)) {
-      captchaSecret = await encrypt(captchaSecret);
+  async saveSettings(settings: Settings, isAdmin: boolean): Promise<Settings> {
+    if (!isAdmin) {
+      throw new Error('Only administrators can modify system settings');
     }
 
-    const settingsToSave = {
+    // 加密敏感字段
+    const providers = settings.oauthProviders.map(p => ({
+      ...p,
+      clientSecret: p.clientSecret ? encrypt(p.clientSecret) : ''
+    }));
+
+    const toSave: Settings = {
       ...settings,
-      oauthProviders: processedProviders,
-      captchaSecretKey: captchaSecret
+      oauthProviders: providers,
+      captchaSecretKey: settings.captchaSecretKey
+        ? encrypt(settings.captchaSecretKey)
+        : '',
+      updatedAt: new Date().toISOString()
     };
 
-    await this.env.DB.prepare(
-      'INSERT INTO user_settings (user_id, settings, created_at, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET settings = ?, updated_at = ?'
-    )
-      .bind(
-        this.userId,
-        JSON.stringify(settingsToSave),
-        now,
-        now,
-        JSON.stringify(settingsToSave),
-        now
-      )
-      .run();
+    const now = new Date().toISOString();
+    const json = JSON.stringify(toSave);
+
+    // UPSERT：先尝试更新，若不存在则插入
+    const existing = await this.env.DB.prepare(
+      'SELECT 1 FROM system_settings WHERE settings_key = ?'
+    ).bind(SYSTEM_SETTINGS_KEY).first();
+
+    if (existing) {
+      await this.env.DB.prepare(
+        'UPDATE system_settings SET settings = ?, updated_at = ? WHERE settings_key = ?'
+      ).bind(json, now, SYSTEM_SETTINGS_KEY).run();
+    } else {
+      await this.env.DB.prepare(
+        'INSERT INTO system_settings (settings_key, settings, created_at, updated_at) VALUES (?, ?, ?, ?)'
+      ).bind(SYSTEM_SETTINGS_KEY, json, now, now).run();
+    }
+
+    return this.getDecryptedSettings();
   }
 
   async getDecryptedSettings(): Promise<Settings> {
-    const settings = await this.getSettings();
-    const decryptedProviders = await Promise.all(
-      settings.oauthProviders.map(async (provider) => ({
-        ...provider,
-        clientSecret: provider.clientSecret
-          ? await decrypt(provider.clientSecret)
-          : ''
-      }))
-    );
+    try {
+      const row = await this.env.DB.prepare(
+        'SELECT settings FROM system_settings WHERE settings_key = ?'
+      ).bind(SYSTEM_SETTINGS_KEY).first<{ settings: string }>();
+
+      if (row) {
+        const parsed = JSON.parse(row.settings) as Settings;
+        const merged = this.mergeDefaults(parsed);
+
+        const providers = await Promise.all(
+          merged.oauthProviders.map(async p => ({
+            ...p,
+            clientSecret: p.clientSecret ? decrypt(p.clientSecret) : ''
+          }))
+        );
+
+        return {
+          ...merged,
+          oauthProviders: providers,
+          captchaSecretKey: merged.captchaSecretKey ? decrypt(merged.captchaSecretKey) : ''
+        };
+      }
+    } catch (e) {
+      console.warn('Failed to decrypt settings', e);
+    }
+    return { ...defaultSettings };
+  }
+
+  // 把旧设置和新字段做合并（向后兼容）
+  private mergeDefaults(parsed: Settings): Settings {
+    const providers = parsed.oauthProviders?.length > 0
+      ? parsed.oauthProviders.map(p => ({
+          name: p.name || 'openauth',
+          label: p.label || 'OpenAuth',
+          enabled: !!p.enabled,
+          clientId: p.clientId || '',
+          clientSecret: p.clientSecret || '',
+          scopes: p.scopes?.length ? p.scopes : ['openid', 'email', 'profile'],
+          type: (p.type as 'oidc') || 'oidc',
+          issuer: p.issuer || ''
+        }))
+      : defaultSettings.oauthProviders;
 
     return {
-      ...settings,
-      oauthProviders: decryptedProviders,
-      captchaSecretKey: settings.captchaSecretKey
-        ? await decrypt(settings.captchaSecretKey)
-        : ''
+      ...defaultSettings,
+      ...parsed,
+      captchaProvider: parsed.captchaProvider || 'turnstile',
+      theme: parsed.theme || 'light',
+      oauthProviders: providers
     };
   }
 }

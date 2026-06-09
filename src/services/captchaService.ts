@@ -3,12 +3,10 @@ import { decrypt } from '../utils/crypto';
 
 export class CaptchaService {
   private env: Env;
-  private userId: string;
   private secretKey: string;
 
-  constructor(env: Env, userId: string, secretKey: string) {
+  constructor(env: Env, secretKey: string) {
     this.env = env;
-    this.userId = userId;
     this.secretKey = secretKey;
   }
 

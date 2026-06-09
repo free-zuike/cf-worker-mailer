@@ -47,7 +47,7 @@ const routes = [
     path: '/settings',
     name: 'Settings',
     component: () => import('./views/Settings.vue'),
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true, requiresAdmin: true }
   }
 ];
 
@@ -61,6 +61,8 @@ router.beforeEach((to, from, next) => {
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next('/login');
+  } else if (to.meta.requiresAdmin && !authStore.isAdmin) {
+    next('/');
   } else if (to.meta.requiresGuest && authStore.isAuthenticated) {
     next('/');
   } else {

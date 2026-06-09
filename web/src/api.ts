@@ -80,6 +80,15 @@ async function request<T>(
     throw new Error('Unauthorized');
   }
 
+  // 403：管理员权限不足
+  if (response.status === 403) {
+    const r = getRouter();
+    if (r) {
+      r.push('/');
+    }
+    throw new Error(result.error || '您没有权限执行此操作');
+  }
+
   const result = await response.json();
 
   if (!response.ok) {

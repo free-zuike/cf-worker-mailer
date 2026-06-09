@@ -89,13 +89,25 @@ export async function initDatabase(env: Env) {
           state TEXT NOT NULL UNIQUE,
           user_id TEXT,
           redirect_uri TEXT NOT NULL,
+          provider TEXT,
+          code_verifier TEXT,
           expires_at INTEGER NOT NULL,
           created_at TEXT NOT NULL
         )
       `).run();
 
       await env.DB.prepare(`
-        CREATE TABLE user_settings (
+        CREATE TABLE system_settings (
+          settings_key TEXT PRIMARY KEY,
+          settings TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      `).run();
+
+      // 旧的 user_settings 表（已弃用）——保留以避免旧部署数据丢失
+      await env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS user_settings (
           user_id TEXT PRIMARY KEY,
           settings TEXT NOT NULL,
           created_at TEXT NOT NULL,
@@ -137,6 +149,24 @@ export async function initDatabase(env: Env) {
           "ALTER TABLE users ADD COLUMN oauth_provider_id TEXT"
         ).run();
       }
+
+      // oauth_states 新字段升级
+      const oauthStateColumns = await env.DB.prepare(
+        "PRAGMA table_info(oauth_states)"
+      ).all();
+      const hasProvider = oauthStateColumns.results.some(col => col.name === 'provider');
+      const hasCodeVerifier = oauthStateColumns.results.some(col => col.name === 'code_verifier');
+
+      if (!hasProvider) {
+        await env.DB.prepare(
+          "ALTER TABLE oauth_states ADD COLUMN provider TEXT"
+        ).run();
+      }
+      if (!hasCodeVerifier) {
+        await env.DB.prepare(
+          "ALTER TABLE oauth_states ADD COLUMN code_verifier TEXT"
+        ).run();
+      }
     }
 
     // 检查 oauth_states 表
@@ -158,12 +188,11 @@ export async function initDatabase(env: Env) {
       console.log('oauth_states table created successfully');
     }
 
-    // 检查 user_settings 表
+    // 检查 user_settings 表（保留旧表避免老数据丢失）
     const userSettingsTable = await env.DB.prepare(
       "SELECT name FROM sqlite_master WHERE type='table' AND name='user_settings'"
     ).first();
     if (!userSettingsTable) {
-      console.log('Creating user_settings table...');
       await env.DB.prepare(`
         CREATE TABLE user_settings (
           user_id TEXT PRIMARY KEY,
@@ -172,7 +201,23 @@ export async function initDatabase(env: Env) {
           updated_at TEXT NOT NULL
         )
       `).run();
-      console.log('user_settings table created successfully');
+    }
+
+    // 检查 system_settings 表（全局系统设置）
+    const systemSettingsTable = await env.DB.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='system_settings'"
+    ).first();
+    if (!systemSettingsTable) {
+      console.log('Creating system_settings table...');
+      await env.DB.prepare(`
+        CREATE TABLE system_settings (
+          settings_key TEXT PRIMARY KEY,
+          settings TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      `).run();
+      console.log('system_settings table created successfully');
     }
 
     console.log('Database initialization completed');

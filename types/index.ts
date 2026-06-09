@@ -157,13 +157,15 @@ export interface OAuthProviderConfig {
   clientId: string;
   clientSecret: string;
   scopes?: string[];
+  type: 'oidc';
+  issuer?: string;
 }
 
 export interface Settings {
   oauthEnabled: boolean;
   oauthProviders: OAuthProviderConfig[];
   captchaEnabled: boolean;
-  captchaProvider: 'turnstile' | 'recaptcha';
+  captchaProvider: 'turnstile';
   captchaSiteKey: string;
   captchaSecretKey: string;
   theme: 'light' | 'dark';
