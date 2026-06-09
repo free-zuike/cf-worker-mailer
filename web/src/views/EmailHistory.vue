@@ -82,16 +82,16 @@ onMounted(() => {
 
 .page-header h2 {
   font-size: 28px;
-  color: #1e3a5f;
+  color: var(--text-color);
   margin-bottom: 32px;
 }
 
 .empty-state {
   text-align: center;
   padding: 80px 20px;
-  background: white;
+  background-color: var(--card-bg);
   border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--card-shadow);
 }
 
 .empty-icon {
@@ -100,13 +100,13 @@ onMounted(() => {
 }
 
 .empty-state p {
-  color: #333;
+  color: var(--text-color);
   font-size: 18px;
   margin-bottom: 8px;
 }
 
 .empty-desc {
-  color: #888 !important;
+  color: var(--text-muted) !important;
   font-size: 14px !important;
 }
 
@@ -117,10 +117,10 @@ onMounted(() => {
 }
 
 .history-item {
-  background: white;
+  background-color: var(--card-bg);
   border-radius: 12px;
   padding: 24px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--card-shadow);
 }
 
 .history-header {
@@ -133,7 +133,7 @@ onMounted(() => {
 .history-subject {
   font-size: 18px;
   font-weight: 600;
-  color: #1e3a5f;
+  color: var(--text-color);
 }
 
 .history-status {
@@ -169,13 +169,13 @@ onMounted(() => {
 }
 
 .detail-label {
-  color: #888;
+  color: var(--text-muted);
   width: 80px;
   flex-shrink: 0;
 }
 
 .detail-value {
-  color: #333;
+  color: var(--text-color);
 }
 
 .history-error {

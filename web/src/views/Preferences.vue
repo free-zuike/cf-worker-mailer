@@ -95,20 +95,20 @@ onMounted(async () => {
 <style scoped>
 .prefs-page { max-width: 600px; margin: 0 auto; padding: 20px; }
 .page-header { margin-bottom: 24px; }
-.page-header h2 { font-size: 28px; color: #1e3a5f; margin: 0; }
+.page-header h2 { font-size: 28px; color: var(--text-color); margin: 0; }
 
 .settings-card {
-  background: #fff;
+  background-color: var(--card-bg);
   border-radius: 12px;
   padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--card-shadow);
 }
 .card-header {
   margin-bottom: 20px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #f0f2f5;
+  border-bottom: 1px solid var(--border-color);
 }
-.card-header h3 { margin: 0; font-size: 18px; font-weight: 600; color: #1f2937; }
+.card-header h3 { margin: 0; font-size: 18px; font-weight: 600; color: var(--text-color); }
 .card-body { display: flex; flex-direction: column; gap: 20px; }
 
 .theme-options {
@@ -127,9 +127,9 @@ onMounted(async () => {
   border: 2px solid transparent;
   transition: all 0.2s;
 }
-.theme-option:hover { background: #f8fafc; }
-.theme-option.active { border-color: #667eea; background: #f0f0ff; }
-.theme-label { font-size: 14px; font-weight: 500; color: #333; }
+.theme-option:hover { background-color: var(--hover-bg); }
+.theme-option.active { border-color: var(--primary-color); background: #f0f0ff; }
+.theme-label { font-size: 14px; font-weight: 500; color: var(--text-color); }
 
 .theme-preview {
   width: 100%;

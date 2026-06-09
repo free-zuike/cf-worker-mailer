@@ -178,7 +178,7 @@ onMounted(() => {
 
 .page-header h2 {
   font-size: 28px;
-  color: #1e3a5f;
+  color: var(--text-color);
 }
 
 .btn-primary {
@@ -205,18 +205,18 @@ onMounted(() => {
 
 .btn-secondary {
   padding: 10px 20px;
-  background: #f0f4f8;
-  color: #1e3a5f;
+  background-color: var(--hover-bg);
+  color: var(--text-color);
   border: none;
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background-color 0.2s;
 }
 
 .btn-secondary:hover {
-  background: #e1e8f0;
+  background-color: var(--active-bg);
 }
 
 .btn-danger {
@@ -238,9 +238,9 @@ onMounted(() => {
 .empty-state {
   text-align: center;
   padding: 80px 20px;
-  background: white;
+  background-color: var(--card-bg);
   border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--card-shadow);
 }
 
 .empty-icon {
@@ -249,13 +249,13 @@ onMounted(() => {
 }
 
 .empty-state p {
-  color: #333;
+  color: var(--text-color);
   font-size: 18px;
   margin-bottom: 8px;
 }
 
 .empty-desc {
-  color: #888 !important;
+  color: var(--text-muted) !important;
   font-size: 14px !important;
 }
 
@@ -266,26 +266,26 @@ onMounted(() => {
 }
 
 .template-card {
-  background: white;
+  background-color: var(--card-bg);
   border-radius: 12px;
   padding: 24px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--card-shadow);
 }
 
 .template-header h3 {
   font-size: 18px;
-  color: #1e3a5f;
+  color: var(--text-color);
   margin: 0 0 8px 0;
 }
 
 .template-subject {
-  color: #888;
+  color: var(--text-muted);
   font-size: 14px;
   margin: 0 0 16px 0;
 }
 
 .template-preview {
-  color: #666;
+  color: var(--text-secondary);
   font-size: 14px;
   margin-bottom: 20px;
 }
