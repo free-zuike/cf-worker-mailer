@@ -37,6 +37,18 @@ const routes = [
     name: 'EmailHistory',
     component: () => import('./views/EmailHistory.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/preferences',
+    name: 'Preferences',
+    component: () => import('./views/Preferences.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/settings',
+    name: 'Settings',
+    component: () => import('./views/Settings.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true }
   }
 ];
 
@@ -50,6 +62,8 @@ router.beforeEach((to, from, next) => {
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next('/login');
+  } else if (to.meta.requiresAdmin && !authStore.isAdmin) {
+    next('/');
   } else if (to.meta.requiresGuest && authStore.isAuthenticated) {
     next('/');
   } else {
