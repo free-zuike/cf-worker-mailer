@@ -6,6 +6,7 @@ import { SmtpService } from '../services/smtpService';
 import { EmailService } from '../services/emailService';
 import { SettingsService, defaultSettings } from '../services/settingsService';
 import { CaptchaService } from '../services/captchaService';
+import { OAuthService } from '../services/oauthService';
 
 const api = new Hono<{ Bindings: Env; Variables: { user: User } }>();
 
@@ -102,7 +103,7 @@ api.post('/auth/login', async (c) => {
   }
 });
 
-// ==================== OAuth 路由（使用设置中的配置） ====================
+// ==================== OAuth 路由（使用通用 OpenAuth 实现，从用户设置读取） ====================
 api.get('/oauth/providers', async (c) => {
   try {
     const settings = await new SettingsService(c.env, 'public').getSettings();
@@ -111,7 +112,8 @@ api.get('/oauth/providers', async (c) => {
       .map(p => ({
         name: p.name,
         label: p.label,
-        enabled: true
+        enabled: true,
+        type: (p as any).type || 'oidc'
       }));
 
     return c.json({ providers });
@@ -124,57 +126,34 @@ api.get('/oauth/authorize', async (c) => {
   try {
     const provider = c.req.query('provider');
     const redirectUri = c.req.query('redirect_uri');
-    
+
     if (!provider || !redirectUri) {
       return c.json({ error: 'provider and redirect_uri are required' }, 400);
     }
 
     const settings = await new SettingsService(c.env, 'public').getDecryptedSettings();
-    const providerConfig = settings.oauthProviders.find(p => p.name === provider);
-    
+    const providerConfig = settings.oauthProviders.find(p => p.name === provider) as any;
+
     if (!providerConfig || !providerConfig.enabled || !providerConfig.clientId || !providerConfig.clientSecret) {
       return c.json({ error: 'OAuth provider not configured' }, 404);
     }
 
-    // 生成 state 用于防止 CSRF
-    const state = crypto.randomUUID();
-    const expiresAt = Date.now() + 10 * 60 * 1000;
+    const oauthService = new OAuthService(c.env);
+    const authUrl = await oauthService.getAuthorizeUrl(
+      {
+        name: providerConfig.name,
+        label: providerConfig.label,
+        enabled: providerConfig.enabled,
+        clientId: providerConfig.clientId,
+        clientSecret: providerConfig.clientSecret,
+        scopes: providerConfig.scopes,
+        type: providerConfig.type || 'oidc',
+        issuer: providerConfig.issuer
+      },
+      redirectUri
+    );
 
-    await c.env.DB.prepare(
-      'INSERT INTO oauth_states (id, state, user_id, redirect_uri, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-    ).bind(
-      crypto.randomUUID(),
-      state,
-      null,
-      redirectUri,
-      expiresAt,
-      new Date().toISOString()
-    ).run();
-
-    let authUrl = '';
-    
-    if (provider === 'github') {
-      const params = new URLSearchParams({
-        client_id: providerConfig.clientId,
-        redirect_uri: `${new URL(c.req.url).origin}/api/oauth/callback`,
-        state,
-        scope: providerConfig.scopes?.join(' ') || 'read:user user:email'
-      });
-      authUrl = `https://github.com/login/oauth/authorize?${params.toString()}`;
-    } else if (provider === 'google') {
-      const params = new URLSearchParams({
-        client_id: providerConfig.clientId,
-        redirect_uri: `${new URL(c.req.url).origin}/api/oauth/callback`,
-        response_type: 'code',
-        scope: providerConfig.scopes?.join(' ') || 'openid email profile',
-        state,
-        access_type: 'online',
-        prompt: 'select_account'
-      });
-      authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-    }
-
-    return c.json({ authUrl, state });
+    return c.json({ authUrl });
   } catch (error) {
     console.error('OAuth authorize error:', error);
     return c.json({ error: (error as Error).message }, 500);
@@ -183,104 +162,49 @@ api.get('/oauth/authorize', async (c) => {
 
 api.get('/oauth/callback', async (c) => {
   try {
-    const provider = c.req.query('provider') || c.req.header('referer')?.includes('github') ? 'github' : 'google';
     const code = c.req.query('code');
     const state = c.req.query('state');
 
     if (!code || !state) {
-      return c.json({ error: 'Invalid callback' }, 400);
+      return c.json({ error: 'Invalid callback: code and state required' }, 400);
     }
 
-    // 验证 state
-    const stateRow = await c.env.DB.prepare(
-      'SELECT redirect_uri, expires_at FROM oauth_states WHERE state = ?'
-    ).bind(state).first<{ redirect_uri: string; expires_at: number }>();
+    // 从 state 反查 provider 和 redirectUri
+    const oauthService = new OAuthService(c.env);
+    const stateData = await oauthService.getState(state);
 
-    if (!stateRow || stateRow.expires_at < Date.now()) {
-      await c.env.DB.prepare('DELETE FROM oauth_states WHERE state = ?').bind(state).run();
+    if (!stateData) {
       return c.json({ error: 'Invalid or expired state' }, 400);
     }
 
-    const redirectUri = stateRow.redirect_uri;
-    await c.env.DB.prepare('DELETE FROM oauth_states WHERE state = ?').bind(state).run();
+    const provider = stateData.provider;
+    const redirectUri = stateData.redirectUri;
+    await oauthService.deleteState(state);
 
-    // 获取设置（解密后的）
+    // 获取对应 provider 的配置
     const settings = await new SettingsService(c.env, 'public').getDecryptedSettings();
-    const providerConfig = settings.oauthProviders.find(p => p.enabled && p.clientId);
-    
+    const providerConfig = settings.oauthProviders.find(p => p.name === provider) as any;
+
     if (!providerConfig || !providerConfig.clientId || !providerConfig.clientSecret) {
       return c.json({ error: 'OAuth provider not configured' }, 404);
     }
 
-    // 交换 token
-    let accessToken = '';
-    let email = '';
-
-    if (provider === 'github') {
-      const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          client_id: providerConfig.clientId,
-          client_secret: providerConfig.clientSecret,
-          code
-        })
-      });
-
-      const tokenData = await tokenResponse.json();
-      accessToken = tokenData.access_token;
-
-      // 获取用户信息
-      const userResponse = await fetch('https://api.github.com/user', {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/json'
-        }
-      });
-      const userData = await userResponse.json();
-
-      if (!userData.email) {
-        const emailsResponse = await fetch('https://api.github.com/user/emails', {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/json'
-          }
-        });
-        const emails = await emailsResponse.json();
-        const primaryEmail = emails.find((e: { primary: boolean; email: string; verified: boolean }) => e.primary && e.verified);
-        email = primaryEmail?.email || emails[0]?.email || '';
-      } else {
-        email = userData.email;
-      }
-    } else if (provider === 'google') {
-      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          client_id: providerConfig.clientId,
-          client_secret: providerConfig.clientSecret,
-          code,
-          grant_type: 'authorization_code',
-          redirect_uri: `${new URL(c.req.url).origin}/api/oauth/callback`
-        })
-      });
-
-      const tokenData = await tokenResponse.json();
-      accessToken = tokenData.access_token;
-
-      const userResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
-      });
-      const userData = await userResponse.json();
-      email = userData.email;
-    }
+    // 用通用实现交换 code
+    const { email, providerUserId } = await oauthService.exchangeCode(
+      {
+        name: providerConfig.name,
+        label: providerConfig.label,
+        enabled: providerConfig.enabled,
+        clientId: providerConfig.clientId,
+        clientSecret: providerConfig.clientSecret,
+        scopes: providerConfig.scopes,
+        type: providerConfig.type || 'oidc',
+        issuer: providerConfig.issuer
+      },
+      code,
+      redirectUri,
+      stateData.codeVerifier
+    );
 
     if (!email) {
       return c.json({ error: 'Failed to get email from provider' }, 400);
@@ -291,13 +215,13 @@ api.get('/oauth/callback', async (c) => {
     let user = await userService.findByEmail(email);
 
     if (!user) {
-      user = await userService.createOAuthUser(email, provider, email);
+      user = await userService.createOAuthUser(email, provider, providerUserId);
     }
 
     // 生成 token
     const { token } = await userService.generateToken(user.id);
 
-    // 重定向到前端回调页面
+    // 重定向回前端
     const frontendCallback = new URL(redirectUri);
     frontendCallback.searchParams.set('token', token.token);
     frontendCallback.searchParams.set('refreshToken', token.refreshToken);

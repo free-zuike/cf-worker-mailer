@@ -3,7 +3,7 @@
     <div class="auth-card">
       <h1>Worker Mailer</h1>
       <h2>登录</h2>
-      
+
       <form @submit.prevent="handleLogin">
         <div class="form-group">
           <label>邮箱</label>
@@ -14,7 +14,7 @@
             placeholder="your@email.com"
           />
         </div>
-        
+
         <div class="form-group">
           <label>密码</label>
           <input
@@ -25,36 +25,42 @@
           />
         </div>
 
-        <div v-if="publicSettings?.captchaEnabled && publicSettings.captchaSiteKey" class="captcha-wrapper">
+        <div
+          v-if="publicSettings?.captchaEnabled && publicSettings.captchaSiteKey"
+          class="captcha-wrapper"
+        >
           <div ref="turnstileRef" class="cf-turnstile" :data-sitekey="publicSettings.captchaSiteKey"></div>
         </div>
-        
+
         <button type="submit" :disabled="authStore.loading" class="btn-primary">
           {{ authStore.loading ? '登录中...' : '登录' }}
         </button>
       </form>
 
-      <div v-if="publicSettings?.oauthEnabled && publicSettings.oauthProviders?.length > 0" class="oauth-section">
+      <div
+        v-if="publicSettings?.oauthEnabled && enabledProviders.length > 0"
+        class="oauth-section"
+      >
         <div class="divider">
-          <span>或者</span>
+          <span>或使用以下方式登录</span>
         </div>
-        
+
         <div class="oauth-buttons">
           <button
-            v-for="provider in publicSettings.oauthProviders"
+            v-for="provider in enabledProviders"
             :key="provider.name"
             @click="handleOAuth(provider.name)"
             class="btn-oauth"
             :class="provider.name"
           >
-            <span class="oauth-icon">{{ provider.name === 'github' ? '' : '' }}</span>
+            <span class="oauth-icon">{{ providerIcon(provider.name, provider.type) }}</span>
             {{ provider.label }}
           </button>
         </div>
       </div>
-      
+
       <p v-if="authStore.error" class="error">{{ authStore.error }}</p>
-      
+
       <p class="link">
         还没有账号？ <router-link to="/register">立即注册</router-link>
       </p>
@@ -63,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { api } from '../api';
@@ -80,8 +86,21 @@ const publicSettings = ref<{
   captchaProvider: string;
   captchaSiteKey: string;
   oauthEnabled: boolean;
-  oauthProviders: { name: string; label: string; enabled: boolean }[];
+  oauthProviders: { name: string; label: string; enabled: boolean; type?: string }[];
 } | null>(null);
+
+const enabledProviders = computed(() => {
+  return publicSettings.value?.oauthProviders?.filter(p => p.enabled) || [];
+});
+
+function providerIcon(name: string, type?: string): string {
+  const t = type || name;
+  if (t === 'github') return 'üêç';
+  if (t === 'google') return 'üòê';
+  if (t === 'discord') return 'üï§';
+  if (t === 'oidc') return 'üîê';
+  return 'üîê';
+}
 
 async function loadPublicSettings() {
   try {
@@ -90,7 +109,7 @@ async function loadPublicSettings() {
       captchaProvider: string;
       captchaSiteKey: string;
       oauthEnabled: boolean;
-      oauthProviders: { name: string; label: string; enabled: boolean }[];
+      oauthProviders: { name: string; label: string; enabled: boolean; type?: string }[];
     }>('/settings/public');
     publicSettings.value = result;
 
@@ -110,7 +129,9 @@ function loadTurnstile(): Promise<void> {
       return;
     }
 
-    const existingScript = document.querySelector('script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]');
+    const existingScript = document.querySelector(
+      'script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]'
+    );
     if (existingScript) {
       existingScript.addEventListener('load', () => {
         renderTurnstile();
@@ -133,7 +154,7 @@ function loadTurnstile(): Promise<void> {
 
 function renderTurnstile() {
   if (!turnstileRef.value || !publicSettings.value?.captchaSiteKey) return;
-  
+
   if ((window as any).turnstile) {
     (window as any).turnstile.render(turnstileRef.value, {
       sitekey: publicSettings.value.captchaSiteKey,
@@ -157,11 +178,17 @@ async function handleLogin() {
 async function handleOAuth(provider: string) {
   try {
     const result = await api.get<{ authUrl: string }>('/oauth/authorize', {
-      params: { provider, redirect_uri: `${window.location.origin}/oauth/callback` }
+      params: {
+        provider,
+        redirect_uri: `${window.location.origin}/oauth/callback`
+      }
     });
     window.location.href = result.authUrl;
   } catch (e) {
     console.error('OAuth authorization failed:', e);
+    if (e instanceof Error) {
+      alert(e.message || 'OAuth 登录失败');
+    }
   }
 }
 
@@ -170,7 +197,9 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  const script = document.querySelector('script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]');
+  const script = document.querySelector(
+    'script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]'
+  );
   if (script) {
     document.head.removeChild(script);
   }
@@ -246,7 +275,7 @@ form {
 .captcha-wrapper {
   display: flex;
   justify-content: center;
-  margin-top: 4px;
+  margin-bottom: 8px;
 }
 
 .cf-turnstile {
