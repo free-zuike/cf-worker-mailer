@@ -15,11 +15,6 @@ const routes = [
     meta: { requiresGuest: true }
   },
   {
-    path: '/oauth/callback',
-    name: 'OAuthCallback',
-    component: () => import('./views/OAuthCallback.vue')
-  },
-  {
     path: '/',
     name: 'Dashboard',
     component: () => import('./views/Dashboard.vue'),
@@ -41,6 +36,12 @@ const routes = [
     path: '/history',
     name: 'EmailHistory',
     component: () => import('./views/EmailHistory.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/preferences',
+    name: 'Preferences',
+    component: () => import('./views/Preferences.vue'),
     meta: { requiresAuth: true }
   },
   {

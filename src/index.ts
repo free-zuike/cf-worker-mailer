@@ -5,11 +5,6 @@ import api from './routes/api';
 import { EmailService } from './services/emailService';
 import { initDatabase } from './db/init';
 
-type QueueMessage = {
-  emailId: string;
-  userId: string;
-};
-
 const app = new Hono<{ Bindings: Env }>();
 
 // CORS 配置（简化版）
@@ -56,7 +51,7 @@ export default {
     return app.fetch(request, env, ctx);
   },
 
-  async queue(batch: MessageBatch<QueueMessage>, env: Env, ctx: ExecutionContext): Promise<void> {
+  async queue(batch: MessageBatch<any>, env: Env, ctx: ExecutionContext): Promise<void> {
     console.log(`Processing ${batch.messages.length} messages from queue`);
 
     for (const message of batch.messages) {
@@ -67,7 +62,7 @@ export default {
         message.ack();
       } catch (error) {
         console.error('Failed to process queue message:', error);
-        // 不调用 retry，让 Cloudflare 自动重试
+        message.retry();
       }
     }
   }

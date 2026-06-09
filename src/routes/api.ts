@@ -1,69 +1,27 @@
 import { Hono } from 'hono';
-import type { Env, User, Settings } from '../../types';
+import type { Env, User } from '../../types';
 import { authMiddleware, adminMiddleware } from '../middleware/auth';
 import { UserService } from '../services/userService';
 import { SmtpService } from '../services/smtpService';
 import { EmailService } from '../services/emailService';
-import { SettingsService, defaultSettings } from '../services/settingsService';
-import { CaptchaService } from '../services/captchaService';
-import { OAuthService } from '../services/oauthService';
+import { SettingsService } from '../services/settingsService';
+import { PreferencesService } from '../services/preferencesService';
 
 const api = new Hono<{ Bindings: Env; Variables: { user: User } }>();
 
-// ==================== 获取公共设置（无需登录） ====================
-api.get('/settings/public', async (c) => {
-  try {
-    const settings = await new SettingsService(c.env).getSettings();
-
-    return c.json({
-      oauthEnabled: settings.oauthEnabled,
-      oauthProviders: settings.oauthProviders
-        .filter(p => p.enabled && p.clientId)
-        .map(p => ({
-          name: p.name,
-          label: p.label,
-          enabled: p.enabled,
-          clientId: p.clientId,
-          type: (p as any).type || 'oidc',
-          issuer: (p as any).issuer || ''
-        })),
-      captchaEnabled: settings.captchaEnabled,
-      captchaProvider: settings.captchaProvider,
-      captchaSiteKey: settings.captchaSiteKey
-    });
-  } catch (error) {
-    return c.json({ error: 'Failed to get settings' }, 500);
-  }
-});
-
-// ==================== 注册 ====================
+// ==================== 认证路由 ====================
 api.post('/auth/register', async (c) => {
   try {
-    const body = await c.req.json();
-    const { email, password, captchaToken } = body;
-
+    const { email, password } = await c.req.json();
     if (!email || !password) {
       return c.json({ error: 'Email and password are required' }, 400);
     }
 
-    // 检查是否需要人机验证
-    const settings = await new SettingsService(c.env).getSettings();
-    if (settings.captchaEnabled && settings.captchaSecretKey) {
-      if (!captchaToken) {
-        return c.json({ error: 'Captcha verification required' }, 400);
-      }
-      const captchaService = new CaptchaService(c.env, settings.captchaSecretKey);
-      const valid = await captchaService.verify(captchaToken);
-      if (!valid) {
-        return c.json({ error: 'Captcha verification failed' }, 400);
-      }
-    }
-
     const userService = new UserService(c.env);
-    const user = await userService.register(email, password);
-    const { user: loggedInUser, token } = await userService.login(email, password);
+    await userService.register(email, password);
+    const { user, token } = await userService.login(email, password);
 
-    return c.json({ user: loggedInUser, token });
+    return c.json({ user, token });
   } catch (error) {
     if ((error as Error).message === 'User already exists') {
       return c.json({ error: 'User already exists' }, 409);
@@ -72,27 +30,11 @@ api.post('/auth/register', async (c) => {
   }
 });
 
-// ==================== 登录 ====================
 api.post('/auth/login', async (c) => {
   try {
-    const body = await c.req.json();
-    const { email, password, captchaToken } = body;
-
+    const { email, password } = await c.req.json();
     if (!email || !password) {
       return c.json({ error: 'Email and password are required' }, 400);
-    }
-
-    // 检查是否需要人机验证
-    const settings = await new SettingsService(c.env).getSettings();
-    if (settings.captchaEnabled && settings.captchaSecretKey) {
-      if (!captchaToken) {
-        return c.json({ error: 'Captcha verification required' }, 400);
-      }
-      const captchaService = new CaptchaService(c.env, settings.captchaSecretKey);
-      const valid = await captchaService.verify(captchaToken);
-      if (!valid) {
-        return c.json({ error: 'Captcha verification failed' }, 400);
-      }
     }
 
     const userService = new UserService(c.env);
@@ -101,137 +43,6 @@ api.post('/auth/login', async (c) => {
     return c.json({ user, token });
   } catch (error) {
     return c.json({ error: 'Invalid credentials' }, 401);
-  }
-});
-
-// ==================== OAuth 路由（使用通用 OpenAuth 实现，从用户设置读取） ====================
-api.get('/oauth/providers', async (c) => {
-  try {
-    const settings = await new SettingsService(c.env).getSettings();
-    const providers = settings.oauthProviders
-      .filter(p => p.enabled && p.clientId)
-      .map(p => ({
-        name: p.name,
-        label: p.label,
-        enabled: true,
-        type: (p as any).type || 'oidc'
-      }));
-
-    return c.json({ providers });
-  } catch (error) {
-    return c.json({ error: 'Failed to get providers' }, 500);
-  }
-});
-
-api.get('/oauth/authorize', async (c) => {
-  try {
-    const provider = c.req.query('provider');
-    const redirectUri = c.req.query('redirect_uri');
-
-    if (!provider || !redirectUri) {
-      return c.json({ error: 'provider and redirect_uri are required' }, 400);
-    }
-
-    const settings = await new SettingsService(c.env).getDecryptedSettings();
-    const providerConfig = settings.oauthProviders.find(p => p.name === provider) as any;
-
-    if (!providerConfig || !providerConfig.enabled || !providerConfig.clientId || !providerConfig.clientSecret) {
-      return c.json({ error: 'OAuth provider not configured' }, 404);
-    }
-
-    const oauthService = new OAuthService(c.env);
-    const authUrl = await oauthService.getAuthorizeUrl(
-      {
-        name: providerConfig.name,
-        label: providerConfig.label,
-        enabled: providerConfig.enabled,
-        clientId: providerConfig.clientId,
-        clientSecret: providerConfig.clientSecret,
-        scopes: providerConfig.scopes,
-        type: providerConfig.type || 'oidc',
-        issuer: providerConfig.issuer
-      },
-      redirectUri
-    );
-
-    return c.json({ authUrl });
-  } catch (error) {
-    console.error('OAuth authorize error:', error);
-    return c.json({ error: (error as Error).message }, 500);
-  }
-});
-
-api.get('/oauth/callback', async (c) => {
-  try {
-    const code = c.req.query('code');
-    const state = c.req.query('state');
-
-    if (!code || !state) {
-      return c.json({ error: 'Invalid callback: code and state required' }, 400);
-    }
-
-    // 从 state 反查 provider 和 redirectUri
-    const oauthService = new OAuthService(c.env);
-    const stateData = await oauthService.getState(state);
-
-    if (!stateData) {
-      return c.json({ error: 'Invalid or expired state' }, 400);
-    }
-
-    const provider = stateData.provider;
-    const redirectUri = stateData.redirectUri;
-    await oauthService.deleteState(state);
-
-    // 获取对应 provider 的配置
-    const settings = await new SettingsService(c.env).getDecryptedSettings();
-    const providerConfig = settings.oauthProviders.find(p => p.name === provider) as any;
-
-    if (!providerConfig || !providerConfig.clientId || !providerConfig.clientSecret) {
-      return c.json({ error: 'OAuth provider not configured' }, 404);
-    }
-
-    // 用通用实现交换 code
-    const { email, providerUserId } = await oauthService.exchangeCode(
-      {
-        name: providerConfig.name,
-        label: providerConfig.label,
-        enabled: providerConfig.enabled,
-        clientId: providerConfig.clientId,
-        clientSecret: providerConfig.clientSecret,
-        scopes: providerConfig.scopes,
-        type: providerConfig.type || 'oidc',
-        issuer: providerConfig.issuer
-      },
-      code,
-      redirectUri,
-      stateData.codeVerifier
-    );
-
-    if (!email) {
-      return c.json({ error: 'Failed to get email from provider' }, 400);
-    }
-
-    // 创建或获取用户
-    const userService = new UserService(c.env);
-    let user = await userService.findByEmail(email);
-
-    if (!user) {
-      user = await userService.createOAuthUser(email, provider, providerUserId);
-    }
-
-    // 生成 token
-    const { token } = await userService.generateToken(user.id);
-
-    // 重定向回前端
-    const frontendCallback = new URL(redirectUri);
-    frontendCallback.searchParams.set('token', token.token);
-    frontendCallback.searchParams.set('refreshToken', token.refreshToken);
-    frontendCallback.searchParams.set('expiresAt', token.expiresAt.toString());
-
-    return c.redirect(frontendCallback.toString());
-  } catch (error) {
-    console.error('OAuth callback error:', error);
-    return c.json({ error: (error as Error).message }, 500);
   }
 });
 
@@ -251,7 +62,25 @@ api.post('/auth/refresh', async (c) => {
   }
 });
 
-// ==================== 需要登录的路由 ====================
+// ==================== 公开设置（无需登录，用于登录/注册页面） ====================
+api.get('/settings/public', async (c) => {
+  try {
+    const settings = new SettingsService(c.env);
+    const s = await settings.getSettings();
+    return c.json({
+      oauthEnabled: s.oauth.enabled,
+      oauthProviders: s.oauth.providers
+        .filter(p => p.enabled && p.clientId)
+        .map(p => ({ name: p.name, label: p.label, enabled: p.enabled, clientId: p.clientId, issuer: p.issuer })),
+      captchaEnabled: s.captcha.enabled,
+      captchaSiteKey: s.captcha.siteKey
+    });
+  } catch (error) {
+    return c.json({ error: 'Failed to get settings' }, 500);
+  }
+});
+
+// ==================== 受保护的路由（需要登录） ====================
 api.use('*', authMiddleware);
 
 api.get('/auth/me', (c) => {
@@ -259,39 +88,44 @@ api.get('/auth/me', (c) => {
   return c.json({ user });
 });
 
-// ==================== 设置路由（全局系统设置，写入需要管理员权限） ====================
-// 读取设置（任何已登录用户可读（不包含 secret）
-api.get('/settings', async (c) => {
+// ==================== 用户偏好路由（所有人可用） ====================
+api.get('/user/preferences', async (c) => {
   const user = c.get('user');
-  const settingsService = new SettingsService(c.env);
-  const settings = await settingsService.getSettings();
-
-  // 管理员返回解密后的完整配置（能看到 Secret），普通用户返回脱敏版本
-  if (user.role === 'admin') {
-    return c.json({ settings: await settingsService.getDecryptedSettings() });
-  }
-
-  return c.json({
-    settings: {
-      ...settings,
-      captchaSecretKey: '',
-      oauthProviders: settings.oauthProviders.map(p => ({
-        ...p,
-        clientSecret: ''
-      }))
-    }
-  });
+  const prefsService = new PreferencesService(c.env, user.id);
+  const prefs = await prefsService.getPreferences();
+  return c.json({ preferences: prefs });
 });
 
-// 修改设置：只有管理员
-api.put('/settings', adminMiddleware, async (c) => {
+api.put('/user/preferences', async (c) => {
   const user = c.get('user');
   const body = await c.req.json();
-  const settings = body.settings as Settings;
+  const prefsService = new PreferencesService(c.env, user.id);
+  const prefs = await prefsService.savePreferences(body.preferences ?? {});
+  return c.json({ preferences: prefs });
+});
 
-  const settingsService = new SettingsService(c.env);
-  const updated = await settingsService.saveSettings(settings, true);
-  return c.json({ settings: updated });
+// ==================== 系统设置路由（仅管理员） ====================
+// 获取系统设置
+api.get('/settings', adminMiddleware, async (c) => {
+  const settings = new SettingsService(c.env);
+  const s = await settings.getDecryptedSettings();
+  return c.json({ settings: s });
+});
+
+// 保存人机验证设置（独立接口）
+api.put('/settings/captcha', adminMiddleware, async (c) => {
+  const body = await c.req.json();
+  const settings = new SettingsService(c.env);
+  const captcha = await settings.saveCaptchaSettings(body.captcha ?? { enabled: false, siteKey: '', secretKey: '' });
+  return c.json({ captcha });
+});
+
+// 保存 OAuth 设置（独立接口）
+api.put('/settings/oauth', adminMiddleware, async (c) => {
+  const body = await c.req.json();
+  const settings = new SettingsService(c.env);
+  const oauth = await settings.saveOAuthSettings(body.oauth ?? { enabled: false, providers: [] });
+  return c.json({ oauth });
 });
 
 // ==================== SMTP 配置路由 ====================

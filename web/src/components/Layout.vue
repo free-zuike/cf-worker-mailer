@@ -18,6 +18,9 @@
         <router-link to="/history" class="nav-item" active-class="active">
           <span>📜</span> 发送历史
         </router-link>
+        <router-link to="/preferences" class="nav-item" active-class="active">
+          <span>🎨</span> 偏好设置
+        </router-link>
         <router-link to="/settings" class="nav-item" active-class="active" v-if="authStore.isAdmin">
           <span>🔧</span> 系统设置
         </router-link>
@@ -63,7 +66,7 @@ function handleLogout() {
 
 .sidebar {
   width: 260px;
-  background: linear-gradient(180deg, #1e3a5f 0%, #0f1f33 100%);
+  background: var(--sidebar-bg, linear-gradient(180deg, #1e3a5f 0%, #0f1f33 100%));
   color: white;
   display: flex;
   flex-direction: column;
@@ -157,5 +160,7 @@ function handleLogout() {
   flex: 1;
   padding: 32px;
   overflow-y: auto;
+  background: var(--bg-color, #f5f7fa);
+  color: var(--text-color, #333);
 }
 </style>

@@ -33,21 +33,6 @@ migrations_dir = "migrations"
 # ADMIN_EMAIL = "admin@example.com"
 
 # ------------------------------------------
-# Cloudflare Queues - 邮件异步发送队列
-# ------------------------------------------
-# 生产者：代码中通过 env.EMAIL_QUEUE.send() 发送消息
-[[queues.producers]]
-queue = "cf-worker-mailer-queue"
-binding = "EMAIL_QUEUE"
-
-# 消费者：由 Worker 的 queue() 函数处理消息
-[[queues.consumers]]
-queue = "cf-worker-mailer-queue"
-max_batch_size = 10
-max_batch_timeout = 30
-max_retries = 3
-
-# ------------------------------------------
 # Workers 日志和监控
 # ------------------------------------------
 [observability]

@@ -110,12 +110,12 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // 登录
-  async function login(email: string, password: string, captchaToken?: string) {
+  async function login(email: string, password: string) {
     loading.value = true;
     error.value = null;
 
     try {
-      const response = await api.post('/auth/login', { email, password, captchaToken });
+      const response = await api.post('/auth/login', { email, password });
       user.value = response.user;
       token.value = response.token;
       saveSession();
@@ -129,12 +129,12 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // 注册
-  async function register(email: string, password: string, captchaToken?: string) {
+  async function register(email: string, password: string) {
     loading.value = true;
     error.value = null;
 
     try {
-      const response = await api.post('/auth/register', { email, password, captchaToken });
+      const response = await api.post('/auth/register', { email, password });
       user.value = response.user;
       token.value = response.token;
       saveSession();
@@ -144,28 +144,6 @@ export const useAuthStore = defineStore('auth', () => {
       return false;
     } finally {
       loading.value = false;
-    }
-  }
-
-  // 设置 token（用于 OAuth）
-  function setToken(tokenStr: string, refreshTokenStr: string, expiresAt: number) {
-    token.value = {
-      token: tokenStr,
-      refreshToken: refreshTokenStr,
-      expiresAt
-    };
-    saveSession();
-  }
-
-  // 获取用户信息
-  async function fetchUser() {
-    try {
-      const response = await api.get('/auth/me');
-      user.value = response.user;
-      saveSession();
-    } catch (e) {
-      console.error('Failed to fetch user:', e);
-      logout();
     }
   }
 
@@ -188,8 +166,6 @@ export const useAuthStore = defineStore('auth', () => {
     refreshToken,
     login,
     register,
-    logout,
-    setToken,
-    fetchUser
+    logout
   };
 });

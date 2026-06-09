@@ -1,53 +1,32 @@
 import type { Env } from '../../types';
 import { encrypt, decrypt } from '../utils/crypto';
+import type { SystemSettings, CaptchaSettings, OAuthSettings, OAuthProviderConfig } from '../../types';
 
-export interface OAuthProviderConfig {
-  name: string;
-  label: string;
-  enabled: boolean;
-  clientId: string;
-  clientSecret: string;
-  scopes?: string[];
-  type: 'oidc';
-  issuer?: string;
-}
+// 系统设置的固定 key
+const SYSTEM_SETTINGS_KEY = 'system';
 
-export interface Settings {
-  oauthEnabled: boolean;
-  oauthProviders: OAuthProviderConfig[];
-  captchaEnabled: boolean;
-  captchaProvider: 'turnstile';
-  captchaSiteKey: string;
-  captchaSecretKey: string;
-  theme: 'light' | 'dark';
-  updatedAt: string;
-}
+// 默认人机验证设置
+const defaultCaptcha: CaptchaSettings = {
+  enabled: false,
+  siteKey: '',
+  secretKey: ''
+};
 
-// 系统级默认值
-export const defaultSettings: Settings = {
-  oauthEnabled: false,
-  oauthProviders: [
+// 默认 OAuth 设置
+const defaultOAuth: OAuthSettings = {
+  enabled: false,
+  providers: [
     {
       name: 'openauth',
       label: 'OpenAuth',
       enabled: false,
       clientId: '',
       clientSecret: '',
-      type: 'oidc',
       scopes: ['openid', 'email', 'profile'],
       issuer: ''
     }
-  ],
-  captchaEnabled: false,
-  captchaProvider: 'turnstile',
-  captchaSiteKey: '',
-  captchaSecretKey: '',
-  theme: 'light',
-  updatedAt: new Date().toISOString()
+  ]
 };
-
-// settings key 固定为 `system`，代表全局系统设置
-const SYSTEM_SETTINGS_KEY = 'system';
 
 export class SettingsService {
   private env: Env;
@@ -56,50 +35,99 @@ export class SettingsService {
     this.env = env;
   }
 
-  async getSettings(): Promise<Settings> {
+  // 获取完整系统设置
+  async getSettings(): Promise<SystemSettings> {
     try {
       const row = await this.env.DB.prepare(
         'SELECT settings FROM system_settings WHERE settings_key = ?'
       ).bind(SYSTEM_SETTINGS_KEY).first<{ settings: string }>();
 
       if (row) {
-        const parsed = JSON.parse(row.settings) as Settings;
-        return this.mergeDefaults(parsed);
+        const parsed = JSON.parse(row.settings);
+        return {
+          captcha: { ...defaultCaptcha, ...parsed.captcha },
+          oauth: this.mergeOAuth(parsed.oauth)
+        };
       }
     } catch (e) {
       console.warn('Failed to load settings, using defaults', e);
     }
-    return { ...defaultSettings };
+    return { captcha: defaultCaptcha, oauth: defaultOAuth };
   }
 
-  async saveSettings(settings: Settings, isAdmin: boolean): Promise<Settings> {
-    if (!isAdmin) {
-      throw new Error('Only administrators can modify system settings');
+  // 获取解密后的系统设置（管理员专用）
+  async getDecryptedSettings(): Promise<SystemSettings> {
+    const settings = await this.getSettings();
+    // 解密密钥
+    if (settings.captcha.secretKey) {
+      try {
+        settings.captcha.secretKey = await decrypt(settings.captcha.secretKey);
+      } catch {
+        // 可能已经是明文
+      }
     }
+    // 解密每个 provider 的密钥
+    for (const p of settings.oauth.providers) {
+      if (p.clientSecret) {
+        try {
+          p.clientSecret = await decrypt(p.clientSecret);
+        } catch {
+          // 可能已经是明文
+        }
+      }
+    }
+    return settings;
+  }
 
-    // 加密敏感字段
-    const providers = settings.oauthProviders.map(p => ({
-      ...p,
-      clientSecret: p.clientSecret ? encrypt(p.clientSecret) : ''
-    }));
-
-    const toSave: Settings = {
-      ...settings,
-      oauthProviders: providers,
-      captchaSecretKey: settings.captchaSecretKey
-        ? encrypt(settings.captchaSecretKey)
-        : '',
-      updatedAt: new Date().toISOString()
+  // 保存人机验证设置（允许空值）
+  async saveCaptchaSettings(captcha: CaptchaSettings): Promise<CaptchaSettings> {
+    const current = await this.getSettings();
+    const toSave: CaptchaSettings = {
+      enabled: captcha.enabled ?? false,
+      siteKey: captcha.siteKey ?? '',
+      // 密钥入数据库时加密
+      secretKey: captcha.secretKey ? await encrypt(captcha.secretKey) : ''
     };
+    const updated: SystemSettings = {
+      captcha: toSave,
+      oauth: current.oauth
+    };
+    await this.saveInternal(updated);
+    return { ...toSave, secretKey: captcha.secretKey ?? '' };
+  }
 
+  // 保存 OAuth 设置（允许空值）
+  async saveOAuthSettings(oauth: OAuthSettings): Promise<OAuthSettings> {
+    const current = await this.getSettings();
+    const providers: OAuthProviderConfig[] = await Promise.all(
+      (oauth.providers ?? []).map(async p => ({
+        name: p.name || 'openauth',
+        label: p.label || 'OpenAuth',
+        enabled: p.enabled ?? false,
+        clientId: p.clientId ?? '',
+        clientSecret: p.clientSecret ? await encrypt(p.clientSecret) : '',
+        scopes: p.scopes?.length ? p.scopes : ['openid', 'email', 'profile'],
+        issuer: p.issuer ?? ''
+      }))
+    );
+    const toSave: OAuthSettings = {
+      enabled: oauth.enabled ?? false,
+      providers
+    };
+    const updated: SystemSettings = {
+      captcha: current.captcha,
+      oauth: toSave
+    };
+    await this.saveInternal(updated);
+    return { ...toSave, providers: providers.map(p => ({ ...p, clientSecret: oauth.providers?.find(op => op.name === p.name)?.clientSecret ?? '' })) };
+  }
+
+  private async saveInternal(settings: SystemSettings) {
     const now = new Date().toISOString();
-    const json = JSON.stringify(toSave);
-
-    // UPSERT：先尝试更新，若不存在则插入
+    const json = JSON.stringify(settings);
     const existing = await this.env.DB.prepare(
       'SELECT 1 FROM system_settings WHERE settings_key = ?'
     ).bind(SYSTEM_SETTINGS_KEY).first();
-
     if (existing) {
       await this.env.DB.prepare(
         'UPDATE system_settings SET settings = ?, updated_at = ? WHERE settings_key = ?'
@@ -109,60 +137,23 @@ export class SettingsService {
         'INSERT INTO system_settings (settings_key, settings, created_at, updated_at) VALUES (?, ?, ?, ?)'
       ).bind(SYSTEM_SETTINGS_KEY, json, now, now).run();
     }
-
-    return this.getDecryptedSettings();
   }
 
-  async getDecryptedSettings(): Promise<Settings> {
-    try {
-      const row = await this.env.DB.prepare(
-        'SELECT settings FROM system_settings WHERE settings_key = ?'
-      ).bind(SYSTEM_SETTINGS_KEY).first<{ settings: string }>();
-
-      if (row) {
-        const parsed = JSON.parse(row.settings) as Settings;
-        const merged = this.mergeDefaults(parsed);
-
-        const providers = await Promise.all(
-          merged.oauthProviders.map(async p => ({
-            ...p,
-            clientSecret: p.clientSecret ? decrypt(p.clientSecret) : ''
-          }))
-        );
-
-        return {
-          ...merged,
-          oauthProviders: providers,
-          captchaSecretKey: merged.captchaSecretKey ? decrypt(merged.captchaSecretKey) : ''
-        };
-      }
-    } catch (e) {
-      console.warn('Failed to decrypt settings', e);
-    }
-    return { ...defaultSettings };
-  }
-
-  // 把旧设置和新字段做合并（向后兼容）
-  private mergeDefaults(parsed: Settings): Settings {
-    const providers = parsed.oauthProviders?.length > 0
-      ? parsed.oauthProviders.map(p => ({
-          name: p.name || 'openauth',
-          label: p.label || 'OpenAuth',
-          enabled: !!p.enabled,
-          clientId: p.clientId || '',
-          clientSecret: p.clientSecret || '',
-          scopes: p.scopes?.length ? p.scopes : ['openid', 'email', 'profile'],
-          type: (p.type as 'oidc') || 'oidc',
-          issuer: p.issuer || ''
-        }))
-      : defaultSettings.oauthProviders;
-
+  private mergeOAuth(oauth: OAuthSettings | undefined): OAuthSettings {
+    if (!oauth) return defaultOAuth;
     return {
-      ...defaultSettings,
-      ...parsed,
-      captchaProvider: parsed.captchaProvider || 'turnstile',
-      theme: parsed.theme || 'light',
-      oauthProviders: providers
+      enabled: oauth.enabled ?? false,
+      providers: (oauth.providers ?? []).length > 0
+        ? oauth.providers.map(p => ({
+            name: p.name || 'openauth',
+            label: p.label || 'OpenAuth',
+            enabled: !!p.enabled,
+            clientId: p.clientId || '',
+            clientSecret: p.clientSecret || '',
+            scopes: p.scopes?.length ? p.scopes : ['openid', 'email', 'profile'],
+            issuer: p.issuer || ''
+          }))
+        : defaultOAuth.providers
     };
   }
 }

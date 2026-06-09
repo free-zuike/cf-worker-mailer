@@ -71,6 +71,16 @@ async function request<T>(
     }
   }
 
+  // 403：管理员权限不足
+  if (response.status === 403) {
+    const r = getRouter();
+    if (r) {
+      r.push('/');
+    }
+    const errBody = await response.json() as any;
+    throw new Error(errBody.error || '您没有权限执行此操作');
+  }
+
   // 如果仍然是 401 或者 refresh token 也失败了
   if (response.status === 401) {
     const r = getRouter();
@@ -80,19 +90,11 @@ async function request<T>(
     throw new Error('Unauthorized');
   }
 
-  // 403：管理员权限不足
-  if (response.status === 403) {
-    const r = getRouter();
-    if (r) {
-      r.push('/');
-    }
-    throw new Error(result.error || '您没有权限执行此操作');
-  }
-
-  const result = await response.json();
+  const result: T = await response.json();
 
   if (!response.ok) {
-    throw new Error(result.error || '请求失败');
+    const errBody = result as any;
+    throw new Error(errBody.error || '请求失败');
   }
 
   return result;

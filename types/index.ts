@@ -111,7 +111,7 @@ export interface EmailRequest {
 
 export interface Attachment {
   filename: string;
-  content: string;
+  content: string; // base64 编码
   contentType?: string;
 }
 
@@ -149,7 +149,7 @@ export interface EmailMetrics {
   byDay: Record<string, { total: number; sent: number; failed: number }>;
 }
 
-// ==================== 后台设置相关类型 ====================
+// ==================== OAuth 提供商配置 ====================
 export interface OAuthProviderConfig {
   name: string;
   label: string;
@@ -157,25 +157,35 @@ export interface OAuthProviderConfig {
   clientId: string;
   clientSecret: string;
   scopes?: string[];
-  type: 'oidc';
   issuer?: string;
 }
 
-export interface Settings {
-  oauthEnabled: boolean;
-  oauthProviders: OAuthProviderConfig[];
-  captchaEnabled: boolean;
-  captchaProvider: 'turnstile';
-  captchaSiteKey: string;
-  captchaSecretKey: string;
+// ==================== 全局系统设置（管理员修改） ====================
+export interface CaptchaSettings {
+  enabled: boolean;
+  siteKey: string;
+  secretKey: string;
+}
+
+export interface OAuthSettings {
+  enabled: boolean;
+  providers: OAuthProviderConfig[];
+}
+
+export interface SystemSettings {
+  captcha: CaptchaSettings;
+  oauth: OAuthSettings;
+}
+
+// ==================== 用户偏好（每个用户自己改） ====================
+export interface UserPreferences {
   theme: 'light' | 'dark';
-  updatedAt: string;
 }
 
 // ==================== 环境类型 ====================
 export interface Env {
   DB: D1Database;
-  EMAIL_QUEUE: Queue;
+  MAIL_QUEUE: Queue;
   ASSETS: { fetch: (request: Request) => Promise<Response> };
   ADMIN_PASSWORD?: string;
   ADMIN_EMAIL?: string;
