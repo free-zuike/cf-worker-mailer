@@ -40,7 +40,10 @@
 
         <div v-if="captchaEnabled" class="captcha-container">
           <div ref="captchaRef" class="turnstile-widget"></div>
-          <p v-if="captchaError" class="captcha-error">请完成人机验证</p>
+          <p v-if="captchaError" class="captcha-error">
+            人机验证失败，请
+            <a href="#" @click.prevent="resetCaptcha">重试</a>
+          </p>
         </div>
         
         <button type="submit" :disabled="authStore.loading">
@@ -123,7 +126,8 @@ function renderTurnstile() {
         captchaToken.value = token;
         captchaError.value = false;
       },
-      'error-callback': () => {
+      'error-callback': (error: any) => {
+        console.error('Turnstile error:', error);
         captchaToken.value = '';
         captchaError.value = true;
       },
@@ -132,6 +136,18 @@ function renderTurnstile() {
         captchaError.value = true;
       }
     });
+  }
+}
+
+function resetCaptcha() {
+  if (window.turnstile && widgetId !== null) {
+    window.turnstile.reset(widgetId);
+    captchaToken.value = '';
+    captchaError.value = false;
+  } else {
+    // 重新渲染
+    widgetId = null;
+    renderTurnstile();
   }
 }
 
@@ -156,6 +172,9 @@ async function handleLogin() {
   const success = await authStore.login(email.value, password.value, captchaToken.value || undefined);
   if (success) {
     router.push('/');
+  } else if (captchaEnabled.value && authStore.error?.includes('Captcha')) {
+    // Captcha 验证失败，重置
+    resetCaptcha();
   }
 }
 
@@ -341,5 +360,11 @@ button[type="submit"]:disabled {
   color: #e74c3c;
   font-size: 14px;
   margin-top: 8px;
+}
+
+.captcha-error a {
+  color: #667eea;
+  text-decoration: underline;
+  cursor: pointer;
 }
 </style>
