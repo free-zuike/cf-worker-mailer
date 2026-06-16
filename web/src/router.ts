@@ -65,8 +65,16 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore();
 
-  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    next('/login');
+  if (to.meta.requiresAuth) {
+    if (!authStore.isAuthenticated) {
+      next('/login');
+    } else if (authStore.isTokenExpired()) {
+      // Token 已过期，清除会话并跳转到登录页
+      authStore.logout();
+      next('/login');
+    } else {
+      next();
+    }
   } else if (to.meta.requiresAdmin && !authStore.isAdmin) {
     next('/');
   } else if (to.meta.requiresGuest && authStore.isAuthenticated) {
