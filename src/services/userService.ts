@@ -302,4 +302,58 @@ export class UserService {
       ).bind(githubId, now, userId).run();
     }
   }
+
+  // 通过 API Key 查找用户
+  async findByApiKey(apiKey: string): Promise<User | null> {
+    // 对传入的 API Key 进行哈希
+    const encoder = new TextEncoder();
+    const data = encoder.encode(apiKey);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashHex = Array.from(new Uint8Array(hashBuffer))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+
+    const row = await this.env.DB.prepare(
+      'SELECT id, email, role, disabled, created_at, updated_at FROM users WHERE api_key_hash = ?'
+    ).bind(hashHex).first<{
+      id: string;
+      email: string;
+      role: string;
+      disabled: number;
+      created_at: string;
+      updated_at: string;
+    }>();
+
+    if (!row || row.disabled) return null;
+
+    return {
+      id: row.id,
+      email: row.email,
+      role: row.role as 'user' | 'admin',
+      disabled: !!row.disabled,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  }
+
+  // 生成并存储 API Key
+  async generateApiKey(userId: string): Promise<string> {
+    const apiKey = 'wk_' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+
+    const encoder = new TextEncoder();
+    const data = encoder.encode(apiKey);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashHex = Array.from(new Uint8Array(hashBuffer))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+
+    const now = new Date().toISOString();
+    await this.env.DB.prepare(
+      'UPDATE users SET api_key_hash = ?, updated_at = ? WHERE id = ?'
+    ).bind(hashHex, now, userId).run();
+
+    return apiKey;
+  }
 }

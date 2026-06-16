@@ -26,6 +26,7 @@ export async function initDatabase(env: Env) {
           github_id TEXT,
           name TEXT,
           avatar_url TEXT,
+          api_key_hash TEXT,
           disabled INTEGER DEFAULT 0,
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL
@@ -171,6 +172,14 @@ export async function initDatabase(env: Env) {
         console.log('Adding avatar_url column to users...');
         await env.DB.prepare(
           "ALTER TABLE users ADD COLUMN avatar_url TEXT"
+        ).run();
+      }
+
+      const hasApiKeyHash = userColumns.results.some(col => col.name === 'api_key_hash');
+      if (!hasApiKeyHash) {
+        console.log('Adding api_key_hash column to users...');
+        await env.DB.prepare(
+          "ALTER TABLE users ADD COLUMN api_key_hash TEXT"
         ).run();
       }
 

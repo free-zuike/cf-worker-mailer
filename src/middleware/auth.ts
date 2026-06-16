@@ -13,7 +13,9 @@ export async function authMiddleware(c: any, next: any) {
     const userService = new UserService(c.env);
     user = await userService.findByToken(token);
   } else if (apiKeyHeader) {
-    user = null;
+    // API Key 验证 - 通过哈希匹配
+    const userService = new UserService(c.env);
+    user = await userService.findByApiKey(apiKeyHeader);
   }
 
   if (!user) {

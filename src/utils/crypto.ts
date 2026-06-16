@@ -1,29 +1,74 @@
-// 简单的加密工具（用于存储敏感数据）
-// 注意：生产环境应该使用更强的加密方案
-const SECRET_KEY = 'worker-mailer-secret-key-change-in-production';
+// 使用 Web Crypto API 的 AES-GCM 加密
+// 注意：生产环境应该使用环境变量存储密钥
 
-export async function encrypt(data: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const dataBytes = encoder.encode(data);
-  const keyBytes = encoder.encode(SECRET_KEY);
-  
-  const encrypted = new Uint8Array(dataBytes.length);
-  for (let i = 0; i < dataBytes.length; i++) {
-    encrypted[i] = dataBytes[i] ^ keyBytes[i % keyBytes.length];
+function hexToBytes(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
   }
-  
-  return btoa(String.fromCharCode(...encrypted));
+  return bytes;
 }
 
-export async function decrypt(encrypted: string): Promise<string> {
-  const decoder = new TextDecoder();
-  const keyBytes = new TextEncoder().encode(SECRET_KEY);
-  const encryptedBytes = Uint8Array.from(atob(encrypted), c => c.charCodeAt(0));
-  
-  const decrypted = new Uint8Array(encryptedBytes.length);
-  for (let i = 0; i < encryptedBytes.length; i++) {
-    decrypted[i] = encryptedBytes[i] ^ keyBytes[i % keyBytes.length];
-  }
-  
-  return decoder.decode(decrypted);
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function getKey(secretKey: string): Promise<CryptoKey> {
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secretKey),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveKey']
+  );
+
+  const salt = encoder.encode('worker-mailer-salt-v1');
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: salt.buffer,
+      iterations: 100000,
+      hash: 'SHA-256'
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+export async function encrypt(data: string, secretKey: string = 'worker-mailer-secret-key-change-in-production'): Promise<string> {
+  const key = await getKey(secretKey);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encoder = new TextEncoder();
+
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    encoder.encode(data)
+  );
+
+  // 将 IV 和加密数据组合在一起
+  const combined = new Uint8Array(iv.length + encrypted.byteLength);
+  combined.set(iv, 0);
+  combined.set(new Uint8Array(encrypted), iv.length);
+
+  return bytesToHex(combined);
+}
+
+export async function decrypt(encrypted: string, secretKey: string = 'worker-mailer-secret-key-change-in-production'): Promise<string> {
+  const key = await getKey(secretKey);
+  const combined = hexToBytes(encrypted);
+
+  const iv = combined.slice(0, 12);
+  const data = combined.slice(12);
+
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    data
+  );
+
+  return new TextDecoder().decode(decrypted);
 }

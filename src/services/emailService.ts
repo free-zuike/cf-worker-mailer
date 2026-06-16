@@ -151,29 +151,32 @@ export class EmailService {
     const secure = port === 465;
     const startTls = port !== 465;
 
-    const mailer = new WorkerMailer({
-      host: config.host,
-      port: port,
-      secure: secure,
-      auth: {
-        user: config.username,
-        pass: smtpConfig.password
+    await WorkerMailer.send(
+      {
+        host: config.host,
+        port: port,
+        secure: secure,
+        startTls: startTls,
+        credentials: {
+          username: config.username,
+          password: smtpConfig.password
+        }
       },
-      tls: {
-        rejectUnauthorized: false
+      {
+        from: email.from,
+        to: email.to,
+        cc: email.cc,
+        bcc: email.bcc,
+        subject: email.subject,
+        html: email.html,
+        text: email.text,
+        attachments: email.attachments?.map(a => ({
+          filename: a.filename,
+          content: a.content,
+          mimeType: a.contentType
+        }))
       }
-    });
-
-    await mailer.sendMail({
-      from: email.from,
-      to: email.to,
-      cc: email.cc,
-      bcc: email.bcc,
-      subject: email.subject,
-      html: email.html,
-      text: email.text,
-      attachments: email.attachments
-    });
+    );
   }
 
   private async sendViaMailChannels(
@@ -191,9 +194,9 @@ export class EmailService {
   ): Promise<void> {
     const personalizations = [
       {
-        to: email.to.map(email => ({ email })),
-        ...(email.cc ? { cc: email.cc.map(email => ({ email })) } : {}),
-        ...(email.bcc ? { bcc: email.bcc.map(email => ({ email })) } : {}),
+        to: email.to.map(addr => ({ email: addr })),
+        ...(email.cc ? { cc: email.cc.map(addr => ({ email: addr })) } : {}),
+        ...(email.bcc ? { bcc: email.bcc.map(addr => ({ email: addr })) } : {}),
         subject: email.subject
       }
     ];

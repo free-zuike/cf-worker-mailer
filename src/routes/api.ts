@@ -379,8 +379,10 @@ api.post('/emails', async (c) => {
 
 api.get('/emails', async (c) => {
   const user = c.get('user');
-  const limit = parseInt(c.req.query('limit') || '50');
-  const offset = parseInt(c.req.query('offset') || '0');
+  const limitParam = parseInt(c.req.query('limit') || '50');
+  const offsetParam = parseInt(c.req.query('offset') || '0');
+  const limit = isNaN(limitParam) || limitParam < 1 ? 50 : Math.min(limitParam, 100);
+  const offset = isNaN(offsetParam) || offsetParam < 0 ? 0 : offsetParam;
   const emailService = new EmailService(c.env, user.id);
   const history = await emailService.listHistory(limit, offset);
   return c.json({ history });
@@ -403,6 +405,14 @@ api.get('/metrics', async (c) => {
   const emailService = new EmailService(c.env, user.id);
   const metrics = await emailService.getMetrics();
   return c.json({ metrics });
+});
+
+// ==================== API Key 路由 ====================
+api.post('/api-key/generate', async (c) => {
+  const user = c.get('user');
+  const userService = new UserService(c.env);
+  const apiKey = await userService.generateApiKey(user.id);
+  return c.json({ apiKey });
 });
 
 export default api;

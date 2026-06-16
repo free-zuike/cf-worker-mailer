@@ -23,6 +23,7 @@ export interface SmtpConfig {
   id: string;
   userId: string;
   name: string;
+  type?: string;
   host: string;
   port: number;
   username: string;
@@ -36,6 +37,7 @@ export interface SmtpConfig {
 
 export interface CreateSmtpConfigRequest {
   name: string;
+  type?: string;
   host: string;
   port: number;
   username: string;
@@ -48,6 +50,7 @@ export interface CreateSmtpConfigRequest {
 
 export interface UpdateSmtpConfigRequest {
   name?: string;
+  type?: string;
   host?: string;
   port?: number;
   username?: string;

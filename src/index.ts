@@ -7,11 +7,20 @@ import { initDatabase } from './db/init';
 
 const app = new Hono<{ Bindings: Env }>();
 
-// CORS 配置（简化版）
+// CORS 配置
 app.use('*', cors({
-  origin: (origin) => {
-    // 默认允许任何来源（简化配置）
-    return origin || '*';
+  origin: (origin, c) => {
+    // 使用环境变量限制允许的来源
+    const env = c.env as Env;
+    const allowedOrigins = env?.ALLOWED_ORIGINS?.split(',').map((o: string) => o.trim()) || [];
+    if (allowedOrigins.length === 0) {
+      // 如果未配置，则仅允许同源请求
+      return origin || null;
+    }
+    if (origin && allowedOrigins.includes(origin)) {
+      return origin;
+    }
+    return null;
   },
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
