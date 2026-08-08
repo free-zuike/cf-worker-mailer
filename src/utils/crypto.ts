@@ -6,7 +6,7 @@ export function requireEncryptionKey(env: { ENCRYPTION_KEY?: string }): string {
   if (!key) {
     throw new Error(
       'ENCRYPTION_KEY environment variable is required. ' +
-      'Set it in wrangler.toml [vars] or via `wrangler secret put ENCRYPTION_KEY`.'
+      'Run: wrangler secret put ENCRYPTION_KEY'
     );
   }
   return key;
