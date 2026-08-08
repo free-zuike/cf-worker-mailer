@@ -26,7 +26,6 @@ declare module "@elegant-router/types" {
     "iframe-page": "/iframe-page/:url";
     "login": "/login/:module(pwd-login|code-login|register|reset-pwd|bind-wechat)?";
     "oauth-callback": "/oauth-callback";
-    "preferences": "/preferences";
     "settings": "/settings";
     "smtp": "/smtp";
     "templates": "/templates";
@@ -71,10 +70,10 @@ declare module "@elegant-router/types" {
     | "iframe-page"
     | "login"
     | "oauth-callback"
-    | "preferences"
     | "settings"
     | "smtp"
     | "templates"
+    | "templates_editor"
   >;
 
   /**
@@ -94,13 +93,12 @@ declare module "@elegant-router/types" {
     | "403"
     | "404"
     | "500"
+    | "compose"
     | "iframe-page"
     | "login"
-    | "compose"
     | "history"
     | "home"
     | "oauth-callback"
-    | "preferences"
     | "settings"
     | "smtp"
     | "templates_editor"
