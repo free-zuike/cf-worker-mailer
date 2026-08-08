@@ -26,7 +26,7 @@ export function setupElegantRouter() {
 
       const constantRoutes: RouteKey[] = ['login', '403', '404', '500'];
 
-      const hideInMenuRoutes: RouteKey[] = ['template-edit', 'oauth-callback', 'iframe-page'];
+      const hideInMenuRoutes: RouteKey[] = ['login', '403', '404', '500', 'template-edit', 'oauth-callback', 'iframe-page'];
 
       const meta: Partial<RouteMeta> = {
         title: key,
