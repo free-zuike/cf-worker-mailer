@@ -41,6 +41,9 @@ async function loadTemplates() {
   const { data, error } = await fetchTemplates();
   if (!error) {
     templates.value = data.templates;
+  } else {
+    message.error('加载模板失败: ' + (error?.message || String(error)));
+    console.error('fetchTemplates error:', error);
   }
   loading.value = false;
 }

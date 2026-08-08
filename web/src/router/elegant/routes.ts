@@ -10,88 +10,146 @@ export const generatedRoutes: GeneratedRoute[] = [
     name: '403',
     path: '/403',
     component: 'layout.blank$view.403',
-    meta: { title: '403', i18nKey: 'route.403', constant: true, hideInMenu: true }
+    meta: {
+      title: '403',
+      i18nKey: 'route.403',
+      constant: true,
+      hideInMenu: true
+    }
   },
   {
     name: '404',
     path: '/404',
     component: 'layout.blank$view.404',
-    meta: { title: '404', i18nKey: 'route.404', constant: true, hideInMenu: true }
+    meta: {
+      title: '404',
+      i18nKey: 'route.404',
+      constant: true,
+      hideInMenu: true
+    }
   },
   {
     name: '500',
     path: '/500',
     component: 'layout.blank$view.500',
-    meta: { title: '500', i18nKey: 'route.500', constant: true, hideInMenu: true }
-  },
-  {
-    name: 'home',
-    path: '/home',
-    component: 'layout.base$view.home',
-    meta: { title: 'home', i18nKey: 'route.home', icon: 'mdi:monitor-dashboard', order: 1 }
+    meta: {
+      title: '500',
+      i18nKey: 'route.500',
+      constant: true,
+      hideInMenu: true
+    }
   },
   {
     name: 'compose',
     path: '/compose',
     component: 'layout.base$view.compose',
-    meta: { title: 'compose', i18nKey: 'route.compose', icon: 'mdi:email-plus-outline', order: 2 }
-  },
-  {
-    name: 'smtp',
-    path: '/smtp',
-    component: 'layout.base$view.smtp',
-    meta: { title: 'smtp', i18nKey: 'route.smtp', icon: 'mdi:server', order: 3 }
-  },
-  {
-    name: 'templates',
-    path: '/templates',
-    component: 'layout.base',
-    meta: { title: 'templates', i18nKey: 'route.templates', icon: 'mdi:file-document-outline', order: 4 },
-    children: [
-      {
-        name: 'templates_index',
-        path: '',
-        component: 'view.templates',
-        meta: { title: 'templates', i18nKey: 'route.templates' }
-      },
-      {
-        name: 'templates_editor',
-        path: '/templates/editor',
-        component: 'view.templates_editor',
-        meta: { title: 'templates_editor', i18nKey: 'route.templates_editor', hideInMenu: true }
-      }
-    ]
+    meta: {
+      title: 'compose',
+      i18nKey: 'route.compose',
+      icon: 'mdi:email-plus-outline',
+      order: 2
+    }
   },
   {
     name: 'history',
     path: '/history',
     component: 'layout.base$view.history',
-    meta: { title: 'history', i18nKey: 'route.history', icon: 'mdi:history', order: 5 }
+    meta: {
+      title: 'history',
+      i18nKey: 'route.history',
+      icon: 'mdi:history',
+      order: 5
+    }
   },
   {
-    name: 'settings',
-    path: '/settings',
-    component: 'layout.base$view.settings',
-    meta: { title: 'settings', i18nKey: 'route.settings', icon: 'mdi:cog-outline', order: 6 }
-  },
-  {
-    name: 'oauth-callback',
-    path: '/oauth-callback',
-    component: 'layout.blank$view.oauth-callback',
-    meta: { title: 'oauth-callback', i18nKey: 'route.oauth-callback', constant: true, hideInMenu: true }
+    name: 'home',
+    path: '/home',
+    component: 'layout.base$view.home',
+    meta: {
+      title: 'home',
+      i18nKey: 'route.home',
+      icon: 'mdi:monitor-dashboard',
+      order: 1
+    }
   },
   {
     name: 'iframe-page',
     path: '/iframe-page/:url',
     component: 'layout.base$view.iframe-page',
     props: true,
-    meta: { title: 'iframe-page', i18nKey: 'route.iframe-page', constant: true, hideInMenu: true, keepAlive: true }
+    meta: {
+      title: 'iframe-page',
+      i18nKey: 'route.iframe-page',
+      constant: true,
+      hideInMenu: true,
+      keepAlive: true
+    }
   },
   {
     name: 'login',
     path: '/login/:module(pwd-login|code-login|register|reset-pwd|bind-wechat)?',
     component: 'layout.blank$view.login',
     props: true,
-    meta: { title: 'login', i18nKey: 'route.login', constant: true, hideInMenu: true }
+    meta: {
+      title: 'login',
+      i18nKey: 'route.login',
+      constant: true,
+      hideInMenu: true
+    }
+  },
+  {
+    name: 'oauth-callback',
+    path: '/oauth-callback',
+    component: 'layout.blank$view.oauth-callback',
+    meta: {
+      title: 'oauth-callback',
+      i18nKey: 'route.oauth-callback',
+      constant: true,
+      hideInMenu: true
+    }
+  },
+  {
+    name: 'settings',
+    path: '/settings',
+    component: 'layout.base$view.settings',
+    meta: {
+      title: 'settings',
+      i18nKey: 'route.settings',
+      icon: 'mdi:cog-outline',
+      order: 6
+    }
+  },
+  {
+    name: 'smtp',
+    path: '/smtp',
+    component: 'layout.base$view.smtp',
+    meta: {
+      title: 'smtp',
+      i18nKey: 'route.smtp',
+      icon: 'mdi:server',
+      order: 3
+    }
+  },
+  {
+    name: 'templates',
+    path: '/templates',
+    component: 'layout.base',
+    meta: {
+      title: 'templates',
+      i18nKey: 'route.templates',
+      icon: 'mdi:file-document-outline',
+      order: 4
+    },
+    children: [
+      {
+        name: 'templates_editor',
+        path: '/templates/editor',
+        component: 'view.templates_editor',
+        meta: {
+          title: 'templates_editor',
+          i18nKey: 'route.templates_editor'
+        }
+      }
+    ]
   }
 ];

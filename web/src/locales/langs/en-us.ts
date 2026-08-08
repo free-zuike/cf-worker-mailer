@@ -233,7 +233,7 @@ const local: App.I18n.Schema = {
     compose: 'Compose',
     smtp: 'SMTP Configs',
     templates: 'Templates',
-    templates_editor: 'Template Editor',
+    'template-editor': 'Template Editor',
     history: 'Email History',
     settings: 'Settings',
     'oauth-callback': 'OAuth Callback'

@@ -229,7 +229,7 @@ const local: App.I18n.Schema = {
     compose: '发送邮件',
     smtp: 'SMTP 配置',
     templates: '邮件模板',
-    templates_editor: '模板编辑',
+    'template-editor': '模板编辑',
     history: '发送历史',
     settings: '系统设置',
     'oauth-callback': 'OAuth 回调'

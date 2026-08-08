@@ -29,7 +29,6 @@ declare module "@elegant-router/types" {
     "settings": "/settings";
     "smtp": "/smtp";
     "templates": "/templates";
-    "templates_index": "/templates";
     "templates_editor": "/templates/editor";
   };
 
@@ -93,16 +92,16 @@ declare module "@elegant-router/types" {
     | "403"
     | "404"
     | "500"
-    | "compose"
     | "iframe-page"
     | "login"
+    | "compose"
     | "history"
     | "home"
     | "oauth-callback"
     | "settings"
     | "smtp"
-    | "templates_index"
     | "templates_editor"
+    | "templates"
   >;
 
   /**
