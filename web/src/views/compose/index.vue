@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue';
+import { onMounted, reactive, ref, watch } from 'vue';
 import { useMessage } from 'naive-ui';
 import { sendEmail, type SendEmailParams } from '@/service/api/email';
 import { fetchSmtpConfigs, type SmtpConfig } from '@/service/api/smtp';
-import { fetchTemplates, type EmailTemplate } from '@/service/api/template';
+import { fetchTemplates, fetchTemplate, type EmailTemplate } from '@/service/api/template';
 
 const message = useMessage();
 const loading = ref(false);
@@ -36,6 +36,17 @@ onMounted(async () => {
   }
   if (!tmplRes.error) {
     templates.value = tmplRes.data.templates;
+  }
+});
+
+// 选中模板时填充主题和内容
+watch(() => form.templateId, async (templateId) => {
+  if (!templateId) return;
+  const { data, error } = await fetchTemplate(templateId);
+  if (!error && data) {
+    form.subject = data.template.subject;
+    form.html = data.template.htmlContent || '';
+    form.text = data.template.textContent || '';
   }
 });
 

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { reactive } from 'vue';
+import { onMounted, nextTick, reactive, ref } from 'vue';
 import { useAuthStore } from '@/store/modules/auth';
 import { useFormRules, useNaiveForm } from '@/hooks/common/form';
-import { $t } from '@/locales';
+import { fetchPublicSettings } from '@/service/api/settings';
 
 defineOptions({
   name: 'PwdLogin'
@@ -11,25 +11,55 @@ defineOptions({
 const authStore = useAuthStore();
 const { formRef, validate } = useNaiveForm();
 
-interface FormModel {
-  email: string;
-  password: string;
-}
+const captchaSiteKey = ref('');
+const captchaToken = ref('');
+const turnstileWidgetId = ref('turnstile-' + Math.random().toString(36).slice(2));
 
-const model: FormModel = reactive({
+const model = reactive({
   email: '',
   password: ''
 });
 
-const rules: Record<keyof FormModel, App.Global.FormRule[]> = {
-  email: { key: 'email', required: true, trigger: 'blur' } as any,
-  password: { key: 'password', required: true, trigger: 'blur' } as any
+const rules: Record<string, App.Global.FormRule[]> = {
+  email: [{ key: 'email', required: true, trigger: 'blur' } as any],
+  password: [{ key: 'password', required: true, trigger: 'blur' } as any]
 };
 
 async function handleSubmit() {
   await validate();
-  await authStore.login(model.email, model.password);
+  await authStore.login(model.email, model.password, true, captchaToken.value || undefined);
 }
+
+function initTurnstile() {
+  if (!captchaSiteKey.value || typeof (window as any).turnstile === 'undefined') return;
+  nextTick(() => {
+    const el = document.getElementById(turnstileWidgetId.value);
+    if (el) {
+      (window as any).turnstile.render(el, {
+        sitekey: captchaSiteKey.value,
+        callback: (token: string) => { captchaToken.value = token; },
+        'expired-callback': () => { captchaToken.value = ''; }
+      });
+    }
+  });
+}
+
+onMounted(async () => {
+  const { data, error } = await fetchPublicSettings();
+  if (!error && data.captchaEnabled && data.captchaSiteKey) {
+    captchaSiteKey.value = data.captchaSiteKey;
+    if (typeof (window as any).turnstile !== 'undefined') {
+      initTurnstile();
+    } else {
+      const script = document.createElement('script');
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+      script.async = true;
+      script.defer = true;
+      script.onload = initTurnstile;
+      document.head.appendChild(script);
+    }
+  }
+});
 </script>
 
 <template>
@@ -46,6 +76,9 @@ async function handleSubmit() {
       />
     </NFormItem>
     <NSpace vertical :size="24">
+      <div v-if="captchaSiteKey" class="flex-center">
+        <div :id="turnstileWidgetId"></div>
+      </div>
       <NButton type="primary" size="large" round block :loading="authStore.loginLoading" @click="handleSubmit">
         登录
       </NButton>

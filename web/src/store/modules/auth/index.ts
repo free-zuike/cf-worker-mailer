@@ -45,10 +45,10 @@ export const useAuthStore = defineStore(SetupStoreId.Auth, () => {
   }
 
   /** Login */
-  async function login(email: string, password: string, redirect = true) {
+  async function login(email: string, password: string, redirect = true, captchaToken?: string) {
     startLoading();
 
-    const { data: loginData, error } = await fetchLogin(email, password);
+    const { data: loginData, error } = await fetchLogin(email, password, captchaToken);
 
     if (!error) {
       const pass = await loginByToken(loginData.token);

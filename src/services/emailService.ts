@@ -159,7 +159,8 @@ export class EmailService {
         credentials: {
           username: config.username,
           password: smtpConfig.password
-        }
+        },
+        authType: ['plain', 'login']
       },
       {
         from: email.from,
