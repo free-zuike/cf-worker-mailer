@@ -226,11 +226,14 @@ const local: App.I18n.Schema = {
     500: '服务器错误',
     'iframe-page': '外链页面',
     home: '首页',
+    compose: '发送邮件',
     smtp: 'SMTP 配置',
     templates: '邮件模板',
     templates_editor: '模板编辑',
     history: '发送历史',
-    settings: '系统设置'
+    settings: '系统设置',
+    preferences: '用户偏好',
+    'oauth-callback': 'OAuth 回调'
   },
   page: {
     login: {

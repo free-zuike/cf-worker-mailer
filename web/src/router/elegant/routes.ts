@@ -40,46 +40,14 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
-    name: 'home',
-    path: '/home',
-    component: 'layout.base$view.home',
+    name: 'compose',
+    path: '/compose',
+    component: 'layout.base$view.compose',
     meta: {
-      title: 'home',
-      i18nKey: 'route.home',
-      icon: 'mdi:monitor-dashboard',
-      order: 1
-    }
-  },
-  {
-    name: 'smtp',
-    path: '/smtp',
-    component: 'layout.base$view.smtp',
-    meta: {
-      title: 'smtp',
-      i18nKey: 'route.smtp',
-      icon: 'mdi:server',
+      title: 'compose',
+      i18nKey: 'route.compose',
+      icon: 'mdi:email-plus-outline',
       order: 2
-    }
-  },
-  {
-    name: 'templates',
-    path: '/templates',
-    component: 'layout.base$view.templates',
-    meta: {
-      title: 'templates',
-      i18nKey: 'route.templates',
-      icon: 'mdi:file-document-outline',
-      order: 3
-    }
-  },
-  {
-    name: 'templates_editor',
-    path: '/templates/editor',
-    component: 'layout.base$view.templates_editor',
-    meta: {
-      title: 'templates_editor',
-      i18nKey: 'route.templates_editor',
-      hideInMenu: true
     }
   },
   {
@@ -90,18 +58,18 @@ export const generatedRoutes: GeneratedRoute[] = [
       title: 'history',
       i18nKey: 'route.history',
       icon: 'mdi:history',
-      order: 4
+      order: 5
     }
   },
   {
-    name: 'settings',
-    path: '/settings',
-    component: 'layout.base$view.settings',
+    name: 'home',
+    path: '/home',
+    component: 'layout.base$view.home',
     meta: {
-      title: 'settings',
-      i18nKey: 'route.settings',
-      icon: 'mdi:cog-outline',
-      order: 5
+      title: 'home',
+      i18nKey: 'route.home',
+      icon: 'mdi:monitor-dashboard',
+      order: 1
     }
   },
   {
@@ -128,5 +96,71 @@ export const generatedRoutes: GeneratedRoute[] = [
       constant: true,
       hideInMenu: true
     }
+  },
+  {
+    name: 'oauth-callback',
+    path: '/oauth-callback',
+    component: 'layout.blank$view.oauth-callback',
+    meta: {
+      title: 'oauth-callback',
+      i18nKey: 'route.oauth-callback',
+      constant: true,
+      hideInMenu: true
+    }
+  },
+  {
+    name: 'preferences',
+    path: '/preferences',
+    component: 'layout.base$view.preferences',
+    meta: {
+      title: 'preferences',
+      i18nKey: 'route.preferences',
+      icon: 'mdi:palette-outline',
+      order: 99
+    }
+  },
+  {
+    name: 'settings',
+    path: '/settings',
+    component: 'layout.base$view.settings',
+    meta: {
+      title: 'settings',
+      i18nKey: 'route.settings',
+      icon: 'mdi:cog-outline',
+      order: 6
+    }
+  },
+  {
+    name: 'smtp',
+    path: '/smtp',
+    component: 'layout.base$view.smtp',
+    meta: {
+      title: 'smtp',
+      i18nKey: 'route.smtp',
+      icon: 'mdi:server',
+      order: 3
+    }
+  },
+  {
+    name: 'templates',
+    path: '/templates',
+    component: 'layout.base',
+    meta: {
+      title: 'templates',
+      i18nKey: 'route.templates',
+      icon: 'mdi:file-document-outline',
+      order: 4
+    },
+    children: [
+      {
+        name: 'templates_editor',
+        path: '/templates/editor',
+        component: 'view.templates_editor',
+        meta: {
+          title: 'templates_editor',
+          i18nKey: 'route.templates_editor'
+        }
+      }
+    ]
   }
 ];

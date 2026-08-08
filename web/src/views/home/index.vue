@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { fetchMetrics, type Metrics } from '@/service/api/email';
 
+const router = useRouter();
 const metrics = ref<Metrics>({ total: 0, sent: 0, failed: 0, pending: 0 });
 const loading = ref(false);
 
@@ -55,5 +57,9 @@ onMounted(loadMetrics);
         </NCard>
       </NGi>
     </NGrid>
+
+    <NButton type="primary" size="large" @click="router.push('/compose')">
+      发送邮件
+    </NButton>
   </NSpace>
 </template>

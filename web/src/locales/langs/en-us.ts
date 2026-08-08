@@ -230,11 +230,14 @@ const local: App.I18n.Schema = {
     500: 'Server Error',
     'iframe-page': 'Iframe',
     home: 'Home',
+    compose: 'Compose',
     smtp: 'SMTP Configs',
     templates: 'Templates',
     templates_editor: 'Template Editor',
     history: 'Email History',
-    settings: 'Settings'
+    settings: 'Settings',
+    preferences: 'Preferences',
+    'oauth-callback': 'OAuth Callback'
   },
   page: {
     login: {

@@ -1,0 +1,138 @@
+<script setup lang="ts">
+import { onMounted, reactive, ref } from 'vue';
+import { useMessage } from 'naive-ui';
+import { sendEmail, type SendEmailParams } from '@/service/api/email';
+import { fetchSmtpConfigs, type SmtpConfig } from '@/service/api/smtp';
+import { fetchTemplates, type EmailTemplate } from '@/service/api/template';
+
+const message = useMessage();
+const loading = ref(false);
+const smtpConfigs = ref<SmtpConfig[]>([]);
+const templates = ref<EmailTemplate[]>([]);
+
+const toInput = ref('');
+const ccInput = ref('');
+const bccInput = ref('');
+
+const form = reactive({
+  configId: null as string | null,
+  templateId: null as string | null,
+  subject: '',
+  html: '',
+  text: ''
+});
+
+function splitEmails(value: string): string[] {
+  return value.split(',').map(s => s.trim()).filter(Boolean);
+}
+
+onMounted(async () => {
+  const [smtpRes, tmplRes] = await Promise.all([
+    fetchSmtpConfigs(),
+    fetchTemplates()
+  ]);
+  if (!smtpRes.error) {
+    smtpConfigs.value = smtpRes.data.configs;
+  }
+  if (!tmplRes.error) {
+    templates.value = tmplRes.data.templates;
+  }
+});
+
+async function handleSend() {
+  const to = splitEmails(toInput.value);
+  if (!to.length) {
+    message.error('请输入收件人');
+    return;
+  }
+  if (!form.subject) {
+    message.error('请输入邮件主题');
+    return;
+  }
+
+  const payload: SendEmailParams = {
+    to,
+    subject: form.subject,
+    html: form.html || undefined,
+    text: form.text || undefined,
+    configId: form.configId || undefined,
+    templateId: form.templateId || undefined
+  };
+
+  const cc = splitEmails(ccInput.value);
+  const bcc = splitEmails(bccInput.value);
+  if (cc.length) payload.cc = cc;
+  if (bcc.length) payload.bcc = bcc;
+
+  loading.value = true;
+  const { error } = await sendEmail(payload);
+  if (!error) {
+    message.success('邮件已发送');
+    toInput.value = '';
+    ccInput.value = '';
+    bccInput.value = '';
+    form.subject = '';
+    form.html = '';
+    form.text = '';
+  }
+  loading.value = false;
+}
+</script>
+
+<template>
+  <NSpace vertical :size="16">
+    <div class="flex-y-center justify-between">
+      <h2 class="text-24px font-600">发送邮件</h2>
+      <NButton type="primary" :loading="loading" @click="handleSend">发送</NButton>
+    </div>
+
+    <NCard :bordered="false" class="card-wrapper">
+      <NForm label-placement="top">
+        <NFormItem label="发件配置">
+          <NSelect
+            v-model:value="form.configId"
+            :options="smtpConfigs.map(c => ({ label: `${c.name} (${c.fromEmail})`, value: c.id }))"
+            placeholder="选择 SMTP 配置（可选）"
+            clearable
+          />
+        </NFormItem>
+        <NFormItem label="邮件模板">
+          <NSelect
+            v-model:value="form.templateId"
+            :options="templates.map(t => ({ label: t.name, value: t.id }))"
+            placeholder="选择模板（可选）"
+            clearable
+          />
+        </NFormItem>
+        <NFormItem label="收件人">
+          <NInput v-model:value="toInput" placeholder="多个地址用逗号分隔" />
+        </NFormItem>
+        <NFormItem label="抄送">
+          <NInput v-model:value="ccInput" placeholder="多个地址用逗号分隔（可选）" />
+        </NFormItem>
+        <NFormItem label="密送">
+          <NInput v-model:value="bccInput" placeholder="多个地址用逗号分隔（可选）" />
+        </NFormItem>
+        <NFormItem label="主题">
+          <NInput v-model:value="form.subject" placeholder="邮件主题" />
+        </NFormItem>
+        <NFormItem label="HTML 内容">
+          <NInput
+            v-model:value="form.html"
+            type="textarea"
+            :autosize="{ minRows: 8, maxRows: 20 }"
+            placeholder="支持 HTML 格式"
+          />
+        </NFormItem>
+        <NFormItem label="纯文本内容">
+          <NInput
+            v-model:value="form.text"
+            type="textarea"
+            :autosize="{ minRows: 4, maxRows: 10 }"
+            placeholder="纯文本内容（可选）"
+          />
+        </NFormItem>
+      </NForm>
+    </NCard>
+  </NSpace>
+</template>
