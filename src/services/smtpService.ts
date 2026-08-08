@@ -4,18 +4,24 @@ import { encrypt, decrypt, requireEncryptionKey } from '../utils/crypto';
 export class SmtpService {
   private env: Env;
   private userId: string;
-  private encryptionKey: string;
+  private _encryptionKey: string | null = null;
 
   constructor(env: Env, userId: string) {
     this.env = env;
     this.userId = userId;
-    this.encryptionKey = requireEncryptionKey(env);
+  }
+
+  private getEncryptionKey(): string {
+    if (!this._encryptionKey) {
+      this._encryptionKey = requireEncryptionKey(this.env);
+    }
+    return this._encryptionKey;
   }
 
   async create(config: CreateSmtpConfigRequest): Promise<SmtpConfig> {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
-    const encryptedPassword = config.password ? await encrypt(config.password, this.encryptionKey) : '';
+    const encryptedPassword = config.password ? await encrypt(config.password, this.getEncryptionKey()) : '';
 
     await this.env.DB.prepare(
       'INSERT INTO smtp_configs (id, user_id, name, type, host, port, username, password, from_email, from_name, secure, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
@@ -68,7 +74,7 @@ export class SmtpService {
     }
     if (updates.password !== undefined) {
       fields.push('password = ?');
-      values.push(await encrypt(updates.password, this.encryptionKey));
+      values.push(await encrypt(updates.password, this.getEncryptionKey()));
     }
     if (updates.fromEmail !== undefined) {
       fields.push('from_email = ?');
@@ -239,7 +245,7 @@ export class SmtpService {
 
     if (!row) return null;
 
-    const password = row.password ? await decrypt(row.password, this.encryptionKey) : '';
+    const password = row.password ? await decrypt(row.password, this.getEncryptionKey()) : '';
 
     return {
       config: {

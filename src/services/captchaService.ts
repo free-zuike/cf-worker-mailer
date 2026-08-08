@@ -4,12 +4,18 @@ import { decrypt, requireEncryptionKey } from '../utils/crypto';
 export class CaptchaService {
   private env: Env;
   private secretKey: string;
-  private encryptionKey: string;
+  private _encryptionKey: string | null = null;
 
   constructor(env: Env, secretKey: string) {
     this.env = env;
     this.secretKey = secretKey;
-    this.encryptionKey = requireEncryptionKey(env);
+  }
+
+  private getEncryptionKey(): string {
+    if (!this._encryptionKey) {
+      this._encryptionKey = requireEncryptionKey(this.env);
+    }
+    return this._encryptionKey;
   }
 
   async verify(token: string): Promise<boolean> {
@@ -20,9 +26,9 @@ export class CaptchaService {
     // 尝试解密密钥
     let key = this.secretKey;
     try {
-      key = await decrypt(this.secretKey, this.encryptionKey);
+      key = await decrypt(this.secretKey, this.getEncryptionKey());
     } catch (e) {
-      // 如果解密失败，就用原值（可能就是明文）
+      // 如果解密失败，就用原值（可能就是明文�?
     }
 
     if (!key) {
