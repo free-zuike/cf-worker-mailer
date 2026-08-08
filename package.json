@@ -5,11 +5,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "cd web && npx -y pnpm@latest dev",
+    "dev": "cd web && pnpm dev",
     "dev:worker": "wrangler dev",
-    "build": "cd web && npx -y pnpm@latest build",
+    "build": "cd web && CI=true npx -y pnpm@latest build",
     "build:worker": "wrangler deploy --dry-run",
-    "deploy": "cd web && npx -y pnpm@latest build && cd .. && wrangler deploy",
+    "deploy": "cd web && CI=true npx -y pnpm@latest build && cd .. && wrangler deploy",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
