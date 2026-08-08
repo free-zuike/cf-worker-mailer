@@ -37,7 +37,6 @@
     "fmt": "oxfmt",
     "gen-route": "sa gen-route",
     "lint": "oxlint --fix && eslint --fix .",
-    "prepare": "simple-git-hooks",
     "preview": "vite preview",
     "release": "sa release",
     "typecheck": "vue-tsc --noEmit --skipLibCheck",
@@ -100,8 +99,8 @@
     "pre-commit": "pnpm typecheck && pnpm lint && pnpm fmt && git diff --exit-code"
   },
   "engines": {
-    "node": ">=20.19.0",
-    "pnpm": ">=10.5.0"
+    "node": ">=18.0.0",
+    "pnpm": ">=9.0.0"
   },
   "website": "https://admin.soybeanjs.cn"
 }
