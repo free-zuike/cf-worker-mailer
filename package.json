@@ -5,11 +5,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "pnpm --dir web dev",
     "dev:worker": "wrangler dev",
-    "build": "vite build",
+    "build": "pnpm --dir web build",
     "build:worker": "wrangler deploy --dry-run",
-    "deploy": "npm run build && wrangler deploy",
+    "deploy": "pnpm --dir web build && wrangler deploy",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

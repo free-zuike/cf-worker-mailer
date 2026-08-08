@@ -5,6 +5,12 @@ import api from './routes/api';
 import { EmailService } from './services/emailService';
 import { initDatabase } from './db/init';
 
+/** 邮件发送队列消息体 */
+interface QueueEmailMessage {
+  emailId: string;
+  userId: string;
+}
+
 const app = new Hono<{ Bindings: Env }>();
 
 // CORS 配置
@@ -60,7 +66,7 @@ export default {
     return app.fetch(request, env, ctx);
   },
 
-  async queue(batch: MessageBatch<any>, env: Env, ctx: ExecutionContext): Promise<void> {
+  async queue(batch: MessageBatch<QueueEmailMessage>, env: Env, ctx: ExecutionContext): Promise<void> {
     console.log(`Processing ${batch.messages.length} messages from queue`);
 
     for (const message of batch.messages) {

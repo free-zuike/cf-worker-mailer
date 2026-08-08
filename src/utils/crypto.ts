@@ -1,5 +1,16 @@
 // 使用 Web Crypto API 的 AES-GCM 加密
-// 注意：生产环境应该使用环境变量存储密钥
+// 密钥必须通过 ENCRYPTION_KEY 环境变量传入
+
+export function requireEncryptionKey(env: { ENCRYPTION_KEY?: string }): string {
+  const key = env.ENCRYPTION_KEY;
+  if (!key) {
+    throw new Error(
+      'ENCRYPTION_KEY environment variable is required. ' +
+      'Set it in wrangler.toml [vars] or via `wrangler secret put ENCRYPTION_KEY`.'
+    );
+  }
+  return key;
+}
 
 function hexToBytes(hex: string): Uint8Array {
   const bytes = new Uint8Array(hex.length / 2);
@@ -38,7 +49,7 @@ async function getKey(secretKey: string): Promise<CryptoKey> {
   );
 }
 
-export async function encrypt(data: string, secretKey: string = 'worker-mailer-secret-key-change-in-production'): Promise<string> {
+export async function encrypt(data: string, secretKey: string): Promise<string> {
   const key = await getKey(secretKey);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encoder = new TextEncoder();
@@ -57,7 +68,7 @@ export async function encrypt(data: string, secretKey: string = 'worker-mailer-s
   return bytesToHex(combined);
 }
 
-export async function decrypt(encrypted: string, secretKey: string = 'worker-mailer-secret-key-change-in-production'): Promise<string> {
+export async function decrypt(encrypted: string, secretKey: string): Promise<string> {
   const key = await getKey(secretKey);
   const combined = hexToBytes(encrypted);
 

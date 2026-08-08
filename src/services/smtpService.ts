@@ -1,19 +1,21 @@
 import type { Env, SmtpConfig, CreateSmtpConfigRequest, UpdateSmtpConfigRequest } from '../../types';
-import { encrypt, decrypt } from '../utils/crypto';
+import { encrypt, decrypt, requireEncryptionKey } from '../utils/crypto';
 
 export class SmtpService {
   private env: Env;
   private userId: string;
+  private encryptionKey: string;
 
   constructor(env: Env, userId: string) {
     this.env = env;
     this.userId = userId;
+    this.encryptionKey = requireEncryptionKey(env);
   }
 
   async create(config: CreateSmtpConfigRequest): Promise<SmtpConfig> {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
-    const encryptedPassword = config.password ? await encrypt(config.password) : '';
+    const encryptedPassword = config.password ? await encrypt(config.password, this.encryptionKey) : '';
 
     await this.env.DB.prepare(
       'INSERT INTO smtp_configs (id, user_id, name, type, host, port, username, password, from_email, from_name, secure, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
@@ -42,7 +44,7 @@ export class SmtpService {
   async update(id: string, updates: UpdateSmtpConfigRequest): Promise<SmtpConfig> {
     const now = new Date().toISOString();
     const fields: string[] = [];
-    const values: any[] = [];
+    const values: unknown[] = [];
 
     if (updates.name !== undefined) {
       fields.push('name = ?');
@@ -66,7 +68,7 @@ export class SmtpService {
     }
     if (updates.password !== undefined) {
       fields.push('password = ?');
-      values.push(await encrypt(updates.password));
+      values.push(await encrypt(updates.password, this.encryptionKey));
     }
     if (updates.fromEmail !== undefined) {
       fields.push('from_email = ?');
@@ -237,7 +239,7 @@ export class SmtpService {
 
     if (!row) return null;
 
-    const password = row.password ? await decrypt(row.password) : '';
+    const password = row.password ? await decrypt(row.password, this.encryptionKey) : '';
 
     return {
       config: {

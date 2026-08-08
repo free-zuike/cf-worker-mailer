@@ -8,6 +8,13 @@
 # 2. 将返回的 database_id 填入 wrangler.toml 的 D1_DATABASE_ID
 
 # ------------------------------------------
+# 加密密钥（必填）
+# ------------------------------------------
+# 用于 SMTP 密码、OAuth 密钥等敏感数据的加密存储
+# 生产环境请使用 `wrangler secret put ENCRYPTION_KEY` 设置
+# ENCRYPTION_KEY = "your-strong-random-secret-key-here"
+
+# ------------------------------------------
 # 其他配置
 # ------------------------------------------
 # ADMIN_PASSWORD - 管理员密码（生产环境使用 wrangler secret put）

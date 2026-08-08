@@ -31,6 +31,16 @@
 npm install
 ```
 
+### 设置环境变量
+
+复制 `.dev.vars.example` 为 `.dev.vars` 并填入配置：
+
+```bash
+cp .dev.vars.example .dev.vars
+```
+
+**必填项：** `ENCRYPTION_KEY` — 用于 SMTP 密码、OAuth 密钥等敏感数据的加密存储。生产环境请使用 `wrangler secret put ENCRYPTION_KEY` 设置。
+
 ### 设置数据库
 
 ```bash
@@ -87,12 +97,13 @@ npm run deploy
 .
 ├── migrations/          # 数据库迁移文件
 ├── src/                 # Worker 后端代码
-│   ├── middleware/      # 中间件
-│   ├── routes/          # API 路由
+│   ├── db/              # 数据库初始化
+│   ├── middleware/       # 中间件（auth, admin）
+│   ├── routes/          # API 路由（auth/smtp/templates/emails/settings/user/misc）
 │   ├── services/        # 业务服务
-│   ├── utils/           # 工具函数
+│   ├── utils/           # 工具函数（crypto, password）
 │   ├── index.ts         # 入口文件
-│   └── types.ts         # 类型定义
+│   └── ...
 ├── types/               # 共享类型
 ├── web/                 # Vue 前端
 │   ├── src/
@@ -144,6 +155,10 @@ npm run deploy
 ### 统计
 
 - `GET /api/metrics` - 获取统计数据
+
+### API Key
+
+- `POST /api/api-key/generate` - 生成 API Key（用于脚本/服务调用）
 
 ## 许可证
 

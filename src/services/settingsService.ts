@@ -1,5 +1,5 @@
 import type { Env } from '../../types';
-import { encrypt, decrypt } from '../utils/crypto';
+import { encrypt, decrypt, requireEncryptionKey } from '../utils/crypto';
 import type { SystemSettings, CaptchaSettings, OAuthSettings, OAuthProviderConfig } from '../../types';
 
 // 系统设置的固定 key
@@ -30,9 +30,11 @@ const defaultOAuth: OAuthSettings = {
 
 export class SettingsService {
   private env: Env;
+  private encryptionKey: string;
 
   constructor(env: Env) {
     this.env = env;
+    this.encryptionKey = requireEncryptionKey(env);
   }
 
   // 获取完整系统设置
@@ -61,7 +63,7 @@ export class SettingsService {
     // 解密密钥
     if (settings.captcha.secretKey) {
       try {
-        settings.captcha.secretKey = await decrypt(settings.captcha.secretKey);
+        settings.captcha.secretKey = await decrypt(settings.captcha.secretKey, this.encryptionKey);
       } catch {
         // 可能已经是明文
       }
@@ -70,7 +72,7 @@ export class SettingsService {
     for (const p of settings.oauth.providers) {
       if (p.clientSecret) {
         try {
-          p.clientSecret = await decrypt(p.clientSecret);
+          p.clientSecret = await decrypt(p.clientSecret, this.encryptionKey);
         } catch {
           // 可能已经是明文
         }
@@ -86,7 +88,7 @@ export class SettingsService {
       enabled: captcha.enabled ?? false,
       siteKey: captcha.siteKey ?? '',
       // 密钥入数据库时加密
-      secretKey: captcha.secretKey ? await encrypt(captcha.secretKey) : ''
+      secretKey: captcha.secretKey ? await encrypt(captcha.secretKey, this.encryptionKey) : ''
     };
     const updated: SystemSettings = {
       captcha: toSave,
@@ -105,7 +107,7 @@ export class SettingsService {
         label: p.label || 'OpenAuth',
         enabled: p.enabled ?? false,
         clientId: p.clientId ?? '',
-        clientSecret: p.clientSecret ? await encrypt(p.clientSecret) : '',
+        clientSecret: p.clientSecret ? await encrypt(p.clientSecret, this.encryptionKey) : '',
         scopes: p.scopes?.length ? p.scopes : ['openid', 'email', 'profile'],
         issuer: p.issuer ?? ''
       }))

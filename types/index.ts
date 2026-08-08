@@ -193,4 +193,6 @@ export interface Env {
   ADMIN_PASSWORD?: string;
   ADMIN_EMAIL?: string;
   ALLOWED_ORIGINS?: string;
+  /** AES-GCM 加密密钥，用于 SMTP 密码和 OAuth/Captcha 密钥的加密存储（必填） */
+  ENCRYPTION_KEY?: string;
 }

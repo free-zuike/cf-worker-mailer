@@ -1,5 +1,5 @@
 import type { Env, User, UserToken } from '../../types';
-import { hashPassword, verifyPassword, generateToken } from '../utils/password';
+import { hashPassword, verifyPassword, generateToken, generateApiKey } from '../utils/password';
 
 export class UserService {
   private env: Env;
@@ -216,7 +216,7 @@ export class UserService {
   async updateUser(id: string, updates: { role?: string; disabled?: boolean }): Promise<User> {
     const now = new Date().toISOString();
     const fields: string[] = [];
-    const values: any[] = [];
+    const values: unknown[] = [];
 
     if (updates.role !== undefined) {
       fields.push('role = ?');
@@ -338,22 +338,11 @@ export class UserService {
 
   // 生成并存储 API Key
   async generateApiKey(userId: string): Promise<string> {
-    const apiKey = 'wk_' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-
-    const encoder = new TextEncoder();
-    const data = encoder.encode(apiKey);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashHex = Array.from(new Uint8Array(hashBuffer))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-
+    const { key, hash } = await generateApiKey();
     const now = new Date().toISOString();
     await this.env.DB.prepare(
       'UPDATE users SET api_key_hash = ?, updated_at = ? WHERE id = ?'
-    ).bind(hashHex, now, userId).run();
-
-    return apiKey;
+    ).bind(hash, now, userId).run();
+    return key;
   }
 }
