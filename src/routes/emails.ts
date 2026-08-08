@@ -11,8 +11,13 @@ emails.post('/', async (c) => {
   const user = c.get('user');
   const data = await c.req.json();
   const emailService = new EmailService(c.env, user.id);
-  const result = await emailService.sendEmail(data);
-  return c.json(result, 202);
+  try {
+    const result = await emailService.sendEmail(data);
+    return c.json(result, 202);
+  } catch (error) {
+    console.error('Send email error:', error);
+    return c.json({ error: (error as Error).message || 'Failed to send email' }, 500);
+  }
 });
 
 emails.get('/', async (c) => {
