@@ -45,14 +45,22 @@ export const generatedRoutes: GeneratedRoute[] = [
   {
     name: 'templates',
     path: '/templates',
-    component: 'layout.base$view.templates',
-    meta: { title: 'templates', i18nKey: 'route.templates', icon: 'mdi:file-document-outline', order: 4 }
-  },
-  {
-    name: 'templates_editor',
-    path: '/templates/editor',
-    component: 'layout.base$view.templates_editor',
-    meta: { title: 'templates_editor', i18nKey: 'route.templates_editor', hideInMenu: true }
+    component: 'layout.base',
+    meta: { title: 'templates', i18nKey: 'route.templates', icon: 'mdi:file-document-outline', order: 4 },
+    children: [
+      {
+        name: 'templates_index',
+        path: '',
+        component: 'view.templates',
+        meta: { title: 'templates', i18nKey: 'route.templates' }
+      },
+      {
+        name: 'templates_editor',
+        path: '/templates/editor',
+        component: 'view.templates_editor',
+        meta: { title: 'templates_editor', i18nKey: 'route.templates_editor', hideInMenu: true }
+      }
+    ]
   },
   {
     name: 'history',

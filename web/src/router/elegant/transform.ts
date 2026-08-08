@@ -175,6 +175,7 @@ const routeMap: RouteMap = {
   "settings": "/settings",
   "smtp": "/smtp",
   "templates": "/templates",
+  "templates_index": "/templates",
   "templates_editor": "/templates/editor"
 };
 
