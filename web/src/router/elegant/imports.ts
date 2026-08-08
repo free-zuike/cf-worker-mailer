@@ -26,6 +26,6 @@ export const views: Record<LastLevelRouteKey, RouteComponent | (() => Promise<Ro
   "oauth-callback": () => import("@/views/oauth-callback/index.vue"),
   settings: () => import("@/views/settings/index.vue"),
   smtp: () => import("@/views/smtp/index.vue"),
-  templates_editor: () => import("@/views/templates/editor/index.vue"),
+  "template-edit": () => import("@/views/template-edit/index.vue"),
   templates: () => import("@/views/templates/index.vue"),
 };

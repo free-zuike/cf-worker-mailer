@@ -9,34 +9,31 @@ export const generatedRoutes: GeneratedRoute[] = [
   {
     name: '403',
     path: '/403',
-    component: 'layout.blank$view.403',
+    component: 'layout.base$view.403',
     meta: {
       title: '403',
       i18nKey: 'route.403',
-      constant: true,
-      hideInMenu: true
+      constant: true
     }
   },
   {
     name: '404',
     path: '/404',
-    component: 'layout.blank$view.404',
+    component: 'layout.base$view.404',
     meta: {
       title: '404',
       i18nKey: 'route.404',
-      constant: true,
-      hideInMenu: true
+      constant: true
     }
   },
   {
     name: '500',
     path: '/500',
-    component: 'layout.blank$view.500',
+    component: 'layout.base$view.500',
     meta: {
       title: '500',
       i18nKey: 'route.500',
-      constant: true,
-      hideInMenu: true
+      constant: true
     }
   },
   {
@@ -45,9 +42,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.compose',
     meta: {
       title: 'compose',
-      i18nKey: 'route.compose',
-      icon: 'mdi:email-plus-outline',
-      order: 2
+      i18nKey: 'route.compose'
     }
   },
   {
@@ -56,9 +51,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.history',
     meta: {
       title: 'history',
-      i18nKey: 'route.history',
-      icon: 'mdi:history',
-      order: 5
+      i18nKey: 'route.history'
     }
   },
   {
@@ -67,9 +60,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.home',
     meta: {
       title: 'home',
-      i18nKey: 'route.home',
-      icon: 'mdi:monitor-dashboard',
-      order: 1
+      i18nKey: 'route.home'
     }
   },
   {
@@ -80,31 +71,27 @@ export const generatedRoutes: GeneratedRoute[] = [
     meta: {
       title: 'iframe-page',
       i18nKey: 'route.iframe-page',
-      constant: true,
-      hideInMenu: true,
-      keepAlive: true
+      hideInMenu: true
     }
   },
   {
     name: 'login',
     path: '/login/:module(pwd-login|code-login|register|reset-pwd|bind-wechat)?',
-    component: 'layout.blank$view.login',
+    component: 'layout.base$view.login',
     props: true,
     meta: {
       title: 'login',
       i18nKey: 'route.login',
-      constant: true,
-      hideInMenu: true
+      constant: true
     }
   },
   {
     name: 'oauth-callback',
     path: '/oauth-callback',
-    component: 'layout.blank$view.oauth-callback',
+    component: 'layout.base$view.oauth-callback',
     meta: {
       title: 'oauth-callback',
       i18nKey: 'route.oauth-callback',
-      constant: true,
       hideInMenu: true
     }
   },
@@ -114,9 +101,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.settings',
     meta: {
       title: 'settings',
-      i18nKey: 'route.settings',
-      icon: 'mdi:cog-outline',
-      order: 6
+      i18nKey: 'route.settings'
     }
   },
   {
@@ -125,31 +110,26 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.smtp',
     meta: {
       title: 'smtp',
-      i18nKey: 'route.smtp',
-      icon: 'mdi:server',
-      order: 3
+      i18nKey: 'route.smtp'
+    }
+  },
+  {
+    name: 'template-edit',
+    path: '/template-edit',
+    component: 'layout.base$view.template-edit',
+    meta: {
+      title: 'template-edit',
+      i18nKey: 'route.template-edit',
+      hideInMenu: true
     }
   },
   {
     name: 'templates',
     path: '/templates',
-    component: 'layout.base',
+    component: 'layout.base$view.templates',
     meta: {
       title: 'templates',
-      i18nKey: 'route.templates',
-      icon: 'mdi:file-document-outline',
-      order: 4
-    },
-    children: [
-      {
-        name: 'templates_editor',
-        path: '/templates/editor',
-        component: 'view.templates_editor',
-        meta: {
-          title: 'templates_editor',
-          i18nKey: 'route.templates_editor'
-        }
-      }
-    ]
+      i18nKey: 'route.templates'
+    }
   }
 ];

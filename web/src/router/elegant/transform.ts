@@ -174,8 +174,8 @@ const routeMap: RouteMap = {
   "oauth-callback": "/oauth-callback",
   "settings": "/settings",
   "smtp": "/smtp",
-  "templates": "/templates",
-  "templates_editor": "/templates/editor"
+  "template-edit": "/template-edit",
+  "templates": "/templates"
 };
 
 /**

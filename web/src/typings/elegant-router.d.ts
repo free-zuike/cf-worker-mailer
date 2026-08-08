@@ -28,8 +28,8 @@ declare module "@elegant-router/types" {
     "oauth-callback": "/oauth-callback";
     "settings": "/settings";
     "smtp": "/smtp";
+    "template-edit": "/template-edit";
     "templates": "/templates";
-    "templates_editor": "/templates/editor";
   };
 
   /**
@@ -72,6 +72,7 @@ declare module "@elegant-router/types" {
     | "oauth-callback"
     | "settings"
     | "smtp"
+    | "template-edit"
     | "templates"
   >;
 
@@ -100,7 +101,7 @@ declare module "@elegant-router/types" {
     | "oauth-callback"
     | "settings"
     | "smtp"
-    | "templates_editor"
+    | "template-edit"
     | "templates"
   >;
 

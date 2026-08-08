@@ -25,7 +25,7 @@ const columns = computed(() => [
     width: 200,
     render: (row: EmailTemplate) => (
       <NSpace justify="center">
-        <NButton size="small" type="primary" onClick={() => router.push(`/templates/editor?id=${row.id}`)}>
+        <NButton size="small" type="primary" onClick={() => router.push(`/template-edit?id=${row.id}`)}>
           编辑
         </NButton>
         <NButton size="small" type="error" onClick={() => handleDelete(row.id)}>
@@ -71,7 +71,7 @@ onMounted(loadTemplates);
   <NSpace vertical :size="16">
     <div class="flex-y-center justify-between">
       <h2 class="text-24px font-600">邮件模板</h2>
-      <NButton type="primary" @click="router.push('/templates/editor')">新建模板</NButton>
+      <NButton type="primary" @click="router.push('/template-edit')">新建模板</NButton>
     </div>
 
     <NDataTable
