@@ -4,6 +4,12 @@ import { useMessage } from 'naive-ui';
 import { sendEmail, type SendEmailParams } from '@/service/api/email';
 import { fetchSmtpConfigs, type SmtpConfig } from '@/service/api/smtp';
 import { fetchTemplates, fetchTemplate, type EmailTemplate } from '@/service/api/template';
+import { Editor, Toolbar } from '@wangeditor/editor-for-vue';
+import { i18nChangeLanguage, type IEditorConfig } from '@wangeditor/editor';
+import '@wangeditor/editor/dist/css/style.css';
+
+// wangEditor 语言设为中文
+i18nChangeLanguage('zh-CN');
 
 const message = useMessage();
 const loading = ref(false);
@@ -21,6 +27,15 @@ const form = reactive({
   html: '',
   text: ''
 });
+
+// wangEditor 配置
+const editorRef = ref<any>(null);
+const editorConfig: Partial<IEditorConfig> = {
+  placeholder: '请输入邮件内容...',
+  MENU_CONF: {}
+};
+
+const toolbarConfig = {};
 
 function splitEmails(value: string): string[] {
   return value.split(',').map(s => s.trim()).filter(Boolean);
@@ -128,12 +143,20 @@ async function handleSend() {
           <NInput v-model:value="form.subject" placeholder="邮件主题" />
         </NFormItem>
         <NFormItem label="HTML 内容">
-          <NInput
-            v-model:value="form.html"
-            type="textarea"
-            :autosize="{ minRows: 8, maxRows: 20 }"
-            placeholder="支持 HTML 格式"
-          />
+          <div style="border: 1px solid #d9d9d9; border-radius: 4px;">
+            <Toolbar
+              :editor="editorRef"
+              :defaultConfig="toolbarConfig"
+              style="border-bottom: 1px solid #d9d9d9;"
+            />
+            <Editor
+              ref="editorRef"
+              v-model="form.html"
+              :defaultConfig="editorConfig"
+              mode="default"
+              style="height: 400px; overflow-y: auto;"
+            />
+          </div>
         </NFormItem>
         <NFormItem label="纯文本内容">
           <NInput
