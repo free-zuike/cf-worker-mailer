@@ -163,7 +163,7 @@ export class EmailService {
         authType: ['plain', 'login']
       },
       {
-        from: email.from,
+        from: { email: config.fromEmail, name: config.fromName || undefined },
         to: email.to,
         cc: email.cc,
         bcc: email.bcc,
