@@ -28,6 +28,15 @@ export function setupElegantRouter() {
 
       const hideInMenuRoutes: RouteKey[] = ['login', '403', '404', '500', 'template-edit', 'oauth-callback', 'iframe-page'];
 
+      const menuConfig: Record<string, { order: number; icon: string }> = {
+        home: { order: 1, icon: 'mdi:monitor-dashboard' },
+        compose: { order: 2, icon: 'mdi:email-plus-outline' },
+        smtp: { order: 3, icon: 'mdi:server' },
+        templates: { order: 4, icon: 'mdi:file-document-outline' },
+        history: { order: 5, icon: 'mdi:history' },
+        settings: { order: 6, icon: 'mdi:cog-outline' }
+      };
+
       const meta: Partial<RouteMeta> = {
         title: key,
         i18nKey: `route.${key}` as App.I18n.I18nKey
@@ -39,6 +48,11 @@ export function setupElegantRouter() {
 
       if (hideInMenuRoutes.includes(key)) {
         meta.hideInMenu = true;
+      }
+
+      if (menuConfig[key]) {
+        meta.order = menuConfig[key].order;
+        meta.icon = menuConfig[key].icon;
       }
 
       return meta;

@@ -45,7 +45,9 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.compose',
     meta: {
       title: 'compose',
-      i18nKey: 'route.compose'
+      i18nKey: 'route.compose',
+      order: 2,
+      icon: 'mdi:email-plus-outline'
     }
   },
   {
@@ -54,7 +56,9 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.history',
     meta: {
       title: 'history',
-      i18nKey: 'route.history'
+      i18nKey: 'route.history',
+      order: 5,
+      icon: 'mdi:history'
     }
   },
   {
@@ -63,7 +67,9 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.home',
     meta: {
       title: 'home',
-      i18nKey: 'route.home'
+      i18nKey: 'route.home',
+      order: 1,
+      icon: 'mdi:monitor-dashboard'
     }
   },
   {
@@ -105,7 +111,9 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.settings',
     meta: {
       title: 'settings',
-      i18nKey: 'route.settings'
+      i18nKey: 'route.settings',
+      order: 6,
+      icon: 'mdi:cog-outline'
     }
   },
   {
@@ -114,7 +122,9 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.smtp',
     meta: {
       title: 'smtp',
-      i18nKey: 'route.smtp'
+      i18nKey: 'route.smtp',
+      order: 3,
+      icon: 'mdi:server'
     }
   },
   {
@@ -133,7 +143,9 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.templates',
     meta: {
       title: 'templates',
-      i18nKey: 'route.templates'
+      i18nKey: 'route.templates',
+      order: 4,
+      icon: 'mdi:file-document-outline'
     }
   }
 ];
