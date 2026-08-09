@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { onMounted, reactive, ref, watch, onBeforeUnmount } from 'vue';
+import { useRouter } from 'vue-router';
 import { useMessage } from 'naive-ui';
 import { sendEmail, type SendEmailParams } from '@/service/api/email';
 import { fetchSmtpConfigs, type SmtpConfig } from '@/service/api/smtp';
@@ -69,13 +70,30 @@ async function loadPageData() {
 }
 
 // 页面不再缓存（keepAlive = false），每次进入都重新创建
+// 但 SPA 路由切换会导致其他页面空白，所以离开时强制刷新
+
+const router = useRouter();
+let hasNavigatedAway = false;
 
 onMounted(() => {
   loadPageData();
 });
 
-onUnmounted(() => {
-  // 不做任何清理
+onBeforeUnmount(() => {
+  if (!hasNavigatedAway) {
+    // 如果是因为路由切换离开，强制刷新目标页面
+    hasNavigatedAway = true;
+  }
+});
+
+// 监听路由离开，用完整页面导航
+router.beforeEach((to, from) => {
+  if (from.name === 'compose' && to.name !== 'compose') {
+    hasNavigatedAway = true;
+    window.location.href = to.fullPath;
+    return false; // 阻止 SPA 路由切换
+  }
+  return true;
 });
 
 // 标记当前是否是模板自动填充内容（避免误判为用户手动修改）
