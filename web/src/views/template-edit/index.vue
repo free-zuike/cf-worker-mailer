@@ -10,6 +10,7 @@ import {
 import { Editor, Toolbar } from '@wangeditor/editor-for-vue';
 import { i18nChangeLanguage, type IEditorConfig } from '@wangeditor/editor';
 import '@wangeditor/editor/dist/css/style.css';
+import { localStg } from '@/utils/storage';
 
 const route = useRoute();
 const router = useRouter();
@@ -33,7 +34,17 @@ const handleCreated = (editor: any) => {
 };
 const editorConfig: Partial<IEditorConfig> = {
   placeholder: '输入模板 HTML 内容，支持 {{变量}} 语法...',
-  MENU_CONF: {}
+  MENU_CONF: {
+    uploadImage: {
+      server: '/api/upload/image',
+      fieldName: 'file',
+      maxFileSize: 10 * 1024 * 1024,
+      allowedFileTypes: ['image/*'],
+      headers: {
+        Authorization: `Bearer ${localStg.get('token') || ''}`
+      }
+    }
+  }
 };
 
 async function loadTemplate() {
