@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch, shallowRef } from 'vue';
+import { onMounted, onUnmounted, reactive, ref, watch, shallowRef } from 'vue';
 import { useMessage } from 'naive-ui';
 import { sendEmail, type SendEmailParams } from '@/service/api/email';
 import { fetchSmtpConfigs, type SmtpConfig } from '@/service/api/smtp';
@@ -52,6 +52,35 @@ const editorConfig: Partial<IEditorConfig> = {
     }
   } as any
 };
+
+// 全屏控制
+const editorWrapperRef = ref<HTMLDivElement | null>(null);
+const isFullScreen = ref(false);
+function toggleFullScreen() {
+  const el = editorWrapperRef.value;
+  if (!el) return;
+  if (!isFullScreen.value) {
+    el.requestFullscreen?.();
+    isFullScreen.value = true;
+  } else {
+    document.exitFullscreen?.();
+    isFullScreen.value = false;
+  }
+}
+const onFsChange = () => {
+  if (!document.fullscreenElement) {
+    isFullScreen.value = false;
+  }
+};
+onMounted(() => {
+  document.addEventListener('fullscreenchange', onFsChange);
+});
+onUnmounted(() => {
+  document.removeEventListener('fullscreenchange', onFsChange);
+  if (document.fullscreenElement) {
+    document.exitFullscreen?.();
+  }
+});
 
 function splitEmails(v: string): string[] {
   return v.split(',').map(s => s.trim()).filter(Boolean);
@@ -190,7 +219,18 @@ function toggleContact(c: Contact, checked: boolean) {
           <NInput v-model:value="form.subject" placeholder="邮件主题" />
         </NFormItem>
         <NFormItem label="HTML 内容">
-          <div style="border: 1px solid #d9d9d9; border-radius: 4px; width: 100%;">
+          <div
+            ref="editorWrapperRef"
+            class="editor-wrapper"
+            :class="{ 'editor-fullscreen': isFullScreen }"
+          >
+            <div class="editor-toolbar-row">
+              <NButton size="small" quaternary circle @click="toggleFullScreen">
+                <template #icon>
+                  <span class="text-16px">{{ isFullScreen ? '⤡' : '⤢' }}</span>
+                </template>
+              </NButton>
+            </div>
             <Toolbar
               :editor="editorRef"
               :defaultConfig="{}"
@@ -246,6 +286,46 @@ function toggleContact(c: Contact, checked: boolean) {
 </template>
 
 <style>
+/* 编辑器容器 */
+.editor-wrapper {
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  width: 100%;
+  position: relative;
+}
+
+/* 全屏模式 */
+.editor-wrapper.editor-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #fff;
+  border: none;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+}
+.editor-wrapper.editor-fullscreen .w-e-text-container {
+  flex: 1;
+  height: auto !important;
+}
+html.dark .editor-wrapper.editor-fullscreen {
+  background: #1e1e1e;
+}
+
+/* 全屏工具栏行 */
+.editor-toolbar-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 2px 4px;
+  background: #f5f5f5;
+  border-bottom: 1px solid #e8e8e8;
+}
+html.dark .editor-toolbar-row {
+  background: #2a2a2a;
+  border-color: #333;
+}
+
 /* 暗色模式适配 wangEditor */
 html.dark .w-e-bar {
   background-color: #1e1e1e;
