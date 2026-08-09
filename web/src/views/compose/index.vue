@@ -180,6 +180,10 @@ async function handleSend() {
     message.error('请输入邮件主题');
     return;
   }
+  if (!form.configId) {
+    message.error('请选择发件配置');
+    return;
+  }
 
   const payload: SendEmailParams = {
     to,

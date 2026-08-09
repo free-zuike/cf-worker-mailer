@@ -62,13 +62,17 @@ export class EmailService {
     let configId = request.configId;
     let fromEmail = request.from;
 
-    if (!configId || !fromEmail) {
-      const defaultConfig = await this.smtpService.getDefaultConfig();
-      if (!defaultConfig) {
-        throw new Error('No SMTP configuration found');
-      }
-      configId = configId || defaultConfig.id;
-      fromEmail = fromEmail || `${defaultConfig.fromName ? `"${defaultConfig.fromName}" ` : ''}<${defaultConfig.fromEmail}>`;
+    if (!configId) {
+      throw new Error('请选择发件配置');
+    }
+
+    // 从发件配置中读取发件人
+    const smtpConfig = await this.smtpService.findById(configId);
+    if (!smtpConfig) {
+      throw new Error('发件配置不存在');
+    }
+    if (!fromEmail) {
+      fromEmail = `${smtpConfig.fromName ? `"${smtpConfig.fromName}" ` : ''}<${smtpConfig.fromEmail}>`;
     }
 
     await this.env.DB.prepare(
