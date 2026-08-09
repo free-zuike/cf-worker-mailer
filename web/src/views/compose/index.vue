@@ -43,6 +43,27 @@ const toolbarConfig = {};
 // 编辑器主题：跟随项目主题
 const editorTheme = computed(() => themeStore.darkMode ? 'dark' : 'light');
 
+// 全屏控制：容器 ref 和切换函数
+const editorWrapperRef = ref<HTMLDivElement | null>(null);
+const isFullScreen = ref(false);
+function toggleFullScreen() {
+  const el = editorWrapperRef.value;
+  if (!el) return;
+  if (!isFullScreen.value) {
+    el.requestFullscreen?.();
+    isFullScreen.value = true;
+  } else {
+    document.exitFullscreen?.();
+    isFullScreen.value = false;
+  }
+}
+// 监听退出全屏事件（ESC 或系统退出）
+watch(isFullScreen, (val) => {
+  if (!val) return;
+  const onExit = () => { isFullScreen.value = false; };
+  document.addEventListener('fullscreenchange', onExit, { once: true });
+});
+
 function splitEmails(value: string): string[] {
   return value.split(',').map(s => s.trim()).filter(Boolean);
 }
@@ -149,7 +170,18 @@ async function handleSend() {
           <NInput v-model:value="form.subject" placeholder="邮件主题" />
         </NFormItem>
         <NFormItem label="HTML 内容">
-          <div style="border: 1px solid #d9d9d9; border-radius: 4px; width: 100%;">
+          <div
+            ref="editorWrapperRef"
+            class="editor-wrapper"
+            :class="{ 'editor-fullscreen': isFullScreen }"
+          >
+            <div class="editor-toolbar-row">
+              <NButton size="small" quaternary circle @click="toggleFullScreen">
+                <template #icon>
+                  <span class="text-16px">{{ isFullScreen ? '⤡' : '⤢' }}</span>
+                </template>
+              </NButton>
+            </div>
             <Toolbar
               :editor="editorRef"
               :defaultConfig="toolbarConfig"
@@ -179,11 +211,44 @@ async function handleSend() {
 
 <!-- wangEditor 暗色主题适配 & 全屏修复 -->
 <style>
-/* 全屏模式下工具栏固定 */
-.w-e-full-screen .w-e-bar {
-  position: sticky;
-  top: 0;
-  z-index: 999;
+/* 编辑器外部容器 */
+.editor-wrapper {
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  width: 100%;
+  position: relative;
+}
+
+/* 编辑器全屏模式 */
+.editor-wrapper.editor-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #fff;
+  border: none;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+}
+.editor-wrapper.editor-fullscreen .w-e-text-container {
+  flex: 1;
+  height: auto !important;
+}
+html.dark .editor-wrapper.editor-fullscreen {
+  background: #1e1e1e;
+}
+
+/* 全屏工具栏行（含全屏按钮） */
+.editor-toolbar-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 2px 4px;
+  background: #f5f5f5;
+  border-bottom: 1px solid #e8e8e8;
+}
+html.dark .editor-toolbar-row {
+  background: #2a2a2a;
+  border-color: #333;
 }
 
 /* 暗色模式适配 */
@@ -201,9 +266,6 @@ html.dark .w-e-bar-item button:hover {
 html.dark .w-e-text-container {
   background-color: #1e1e1e;
   color: #ccc;
-}
-html.dark .w-e-text-container .w-e-scroll {
-  background-color: #1e1e1e;
 }
 html.dark .w-e-text-container [data-slate-editor] {
   background-color: #1e1e1e;
