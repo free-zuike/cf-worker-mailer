@@ -46,19 +46,11 @@ export class EmailService {
     // 全局变量替换（除非明确要求跳过）
     if (!request.skipVariableReplace) {
       const globalVars = await this.globalVariableService.getKeyValueMap();
-      console.log('[email] globalVars:', JSON.stringify(globalVars));
-      console.log('[email] skipVariableReplace:', request.skipVariableReplace);
       if (html) {
-        const before = html;
         html = this.templateService.applyVariables(html, { ...globalVars, ...(request.templateVariables || {}) });
-        console.log('[email] html before:', before.substring(0, 200));
-        console.log('[email] html after:', html.substring(0, 200));
       }
       if (text) {
-        const before = text;
         text = this.templateService.applyVariables(text, { ...globalVars, ...(request.templateVariables || {}) });
-        console.log('[email] text before:', before.substring(0, 200));
-        console.log('[email] text after:', text.substring(0, 200));
       }
     }
 

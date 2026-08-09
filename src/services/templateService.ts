@@ -153,26 +153,26 @@ export class TemplateService {
       allVariables.set(key, value);
     });
 
-    const ESCAPED_PLACEHOLDER = '\x00ESCAPED_BRACE\x00';
+    const ESC_OPEN = '\x00ESC_OPEN\x00';
+    const ESC_CLOSE = '\x00ESC_CLOSE\x00';
 
-    // 第一步：处理转义 —— 把不替换的变量标记为占位符
+    // 第一步：处理转义——把不替换的变量标记为占位符
     let result = content
-      // 全角括号 ｛｛name｝｝ → 显示为 {{name}} 但不替换
-      .replace(/｛｛([^｝]+)｝｝/g, (_, name) => {
-        return ESCAPED_PLACEHOLDER + name + ESCAPED_PLACEHOLDER;
-      })
+      // 全角括号 ｛｛name｝｝ → 用不同占位符标记左右括号
+      .replace(/｛｛/g, ESC_OPEN)
+      .replace(/｝｝/g, ESC_CLOSE)
       // wangEditor 可能把 \ 存为 HTML 实体 &#92;
-      .replace(/&#92;\{\{/g, ESCAPED_PLACEHOLDER)
+      .replace(/&#92;\{\{/g, ESC_OPEN)
       // 也可能直接存反斜杠
-      .replace(/\\\{\{/g, ESCAPED_PLACEHOLDER);
+      .replace(/\\\{\{/g, ESC_OPEN);
 
     // 第二步：替换变量
     allVariables.forEach((value, key) => {
       result = result.replace(new RegExp(`{{${key}}}`, 'g'), value);
     });
 
-    // 第三步：占位符恢复为 {{
-    result = result.replace(new RegExp(ESCAPED_PLACEHOLDER, 'g'), '{{');
+    // 第三步：占位符恢复为括号
+    result = result.replace(new RegExp(ESC_OPEN, 'g'), '{{').replace(new RegExp(ESC_CLOSE, 'g'), '}}');
 
     return result;
   }
