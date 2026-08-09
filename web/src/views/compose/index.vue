@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref, shallowRef, watch, computed } from 'vue';
-import { onBeforeRouteLeave } from 'vue-router';
+import { onMounted, onUnmounted, reactive, ref, shallowRef, watch, computed } from 'vue';
 import { useMessage } from 'naive-ui';
 import { useThemeStore } from '@/store/modules/theme';
 import { sendEmail, type SendEmailParams } from '@/service/api/email';
@@ -129,15 +128,12 @@ onMounted(async () => {
 
 // 页面不再缓存（keepAlive = false），每次进入都重新创建
 
-// 离开 compose 页面时，强制完整页面导航（解决 wangEditor 残留导致其他页面空白的问题）
-onBeforeRouteLeave((to, from, next) => {
-  // 先清理 wangEditor 残留 DOM
+// 离开页面时清理 wangEditor DOM 残留（正常路由切换，不强制刷新）
+onUnmounted(() => {
   document.querySelectorAll('.w-e-bar, .w-e-text-container, [data-w-e-type], .w-e-modal, [class*="w-e-"]').forEach(el => {
     if (el.parentElement) el.remove();
   });
   document.body.classList.remove('w-e-full-screen');
-  // 完整页面导航，避免 SPA 切换时的渲染问题
-  window.location.href = to.fullPath;
 });
 
 // 标记当前是否是模板自动填充内容（避免误判为用户手动修改）
