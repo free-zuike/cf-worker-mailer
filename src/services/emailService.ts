@@ -45,15 +45,12 @@ export class EmailService {
 
     // 无论是否使用模板，都对最终内容做全局变量替换
     const globalVars = await this.globalVariableService.getKeyValueMap();
-    console.log('[email] globalVars:', JSON.stringify(globalVars));
-    console.log('[email] html before:', html);
     if (html) {
       html = this.templateService.applyVariables(html, { ...globalVars, ...(request.templateVariables || {}) });
     }
     if (text) {
       text = this.templateService.applyVariables(text, { ...globalVars, ...(request.templateVariables || {}) });
     }
-    console.log('[email] html after:', html);
 
     const toEmails = Array.isArray(request.to) ? request.to : [request.to];
     const ccEmails = request.cc ? (Array.isArray(request.cc) ? request.cc : [request.cc]) : undefined;
