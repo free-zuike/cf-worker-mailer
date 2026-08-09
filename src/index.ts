@@ -75,6 +75,12 @@ app.get('*', async (c) => {
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    // 初始化数据库（幂等，确保表存在）
+    try {
+      await initDatabase(env);
+    } catch (error) {
+      console.error('Database init failed:', error);
+    }
     return app.fetch(request, env, ctx);
   },
 
