@@ -45,7 +45,7 @@ app.get('/health', async (c) => {
 
 // 提供 R2 上传的文件（必须放在 /api 路由之前，避免被认证中间件拦截）
 app.get('/api/uploads/*', async (c) => {
-  const key = c.req.path.replace('/api/', '');
+  const key = c.req.path.replace('/api/uploads/', '');
   const object = await c.env.R2_UPLOAD_BUCKET.get(key);
   if (!object) return c.json({ error: 'File not found' }, 404);
   const headers = new Headers();
