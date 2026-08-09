@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, reactive, ref, shallowRef, watch, computed } from 'vue';
-import { onBeforeRouteLeave } from 'vue-router';
+import { useRouter } from 'vue-router';
 import { useMessage } from 'naive-ui';
 import { useThemeStore } from '@/store/modules/theme';
 import { sendEmail, type SendEmailParams } from '@/service/api/email';
@@ -138,17 +138,21 @@ function cleanupWangEditor() {
   document.body.classList.remove('w-e-full-screen');
 }
 
+// 离开 compose 页面时，在路由切换完成后清理 wangEditor 残留
+const router = useRouter();
+const removeAfterGuard = router.afterEach(() => {
+  cleanupWangEditor();
+  setTimeout(() => cleanupWangEditor(), 50);
+});
+
 onMounted(() => {
   cleanupWangEditor();
   loadPageData();
 });
 
-// 离开 compose 页面时，正常路由切换并清理 wangEditor（不刷新）
-onBeforeRouteLeave((to, from, next) => {
+onUnmounted(() => {
+  removeAfterGuard();
   cleanupWangEditor();
-  // 延迟清理，确保路由切换完成后移除残留
-  setTimeout(() => cleanupWangEditor(), 0);
-  next();
 });
 
 // 标记当前是否是模板自动填充内容（避免误判为用户手动修改）
