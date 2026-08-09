@@ -95,6 +95,14 @@ export function fetchEmail(id: string) {
   return request<{ email: EmailHistoryItem }>({ url: `/emails/${id}` });
 }
 
+/** 重试发送失败的邮件 */
+export function retryEmail(id: string) {
+  return request<{ success: boolean }>({
+    url: `/emails/${id}/retry`,
+    method: 'post'
+  });
+}
+
 /** 获取统计 */
 export function fetchMetrics() {
   return request<{ metrics: Metrics }>({ url: '/metrics' });

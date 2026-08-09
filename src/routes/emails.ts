@@ -42,4 +42,17 @@ emails.get('/:id', async (c) => {
   return c.json({ email });
 });
 
+// 重试发送失败的邮件
+emails.post('/:id/retry', async (c) => {
+  const user = c.get('user');
+  const id = c.req.param('id');
+  const emailService = new EmailService(c.env, user.id);
+  try {
+    await emailService.retryFailedEmail(id);
+    return c.json({ success: true });
+  } catch (error) {
+    return c.json({ error: (error as Error).message || 'Retry failed' }, 400);
+  }
+});
+
 export default emails;

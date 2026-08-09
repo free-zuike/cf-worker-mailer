@@ -132,6 +132,19 @@ export class EmailService {
     }
   }
 
+  /** 重试发送失败的邮件 */
+  async retryFailedEmail(emailId: string): Promise<void> {
+    const history = await this.getHistory(emailId);
+    if (!history) {
+      throw new Error('Email not found');
+    }
+    if (history.status !== 'failed') {
+      throw new Error('Only failed emails can be retried');
+    }
+    await this.updateHistoryStatus(emailId, 'pending');
+    await this.processEmail(emailId);
+  }
+
   private async sendViaSMTP(
     smtpConfig: { config: SmtpConfig; password: string },
     email: {
@@ -310,7 +323,7 @@ export class EmailService {
     }));
   }
 
-  private async updateHistoryStatus(id: string, status: 'sent' | 'failed', errorMessage?: string): Promise<void> {
+  private async updateHistoryStatus(id: string, status: 'sent' | 'failed' | 'pending', errorMessage?: string): Promise<void> {
     const now = new Date().toISOString();
     await this.env.DB.prepare(
       'UPDATE email_history SET status = ?, error_message = ?, sent_at = ? WHERE id = ? AND user_id = ?'

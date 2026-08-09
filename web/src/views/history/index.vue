@@ -1,7 +1,9 @@
 <script setup lang="tsx">
 import { computed, onMounted, ref } from 'vue';
-import { NTag } from 'naive-ui';
-import { fetchEmailHistory, fetchEmail, type EmailHistoryItem } from '@/service/api/email';
+import { NTag, useMessage } from 'naive-ui';
+import { fetchEmailHistory, fetchEmail, retryEmail, type EmailHistoryItem } from '@/service/api/email';
+
+const message = useMessage();
 
 const history = ref<EmailHistoryItem[]>([]);
 const loading = ref(false);
@@ -31,9 +33,14 @@ const columns = computed(() => [
   {
     title: '操作',
     key: 'actions',
-    width: 100,
+    width: 160,
     render: (row: EmailHistoryItem) => (
-      <NButton size="small" onClick={() => showDetailFn(row.id)}>详情</NButton>
+      <NSpace>
+        <NButton size="small" onClick={() => showDetailFn(row.id)}>详情</NButton>
+        {row.status === 'failed' && (
+          <NButton size="small" type="warning" onClick={() => handleRetry(row.id)}>重试</NButton>
+        )}
+      </NSpace>
     )
   }
 ]);
@@ -53,6 +60,14 @@ async function showDetailFn(id: string) {
   detailEmail.value = data.email;
   showHtml.value = false;
   showDetail.value = true;
+}
+
+async function handleRetry(id: string) {
+  const { error } = await retryEmail(id);
+  if (!error) {
+    message.success('已重新发送');
+    loadHistory();
+  }
 }
 
 onMounted(loadHistory);
