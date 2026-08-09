@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, shallowRef } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useMessage } from 'naive-ui';
 import {
@@ -7,6 +7,9 @@ import {
   createTemplate,
   updateTemplate
 } from '@/service/api/template';
+import { Editor, Toolbar } from '@wangeditor/editor-for-vue';
+import { i18nChangeLanguage, type IEditorConfig } from '@wangeditor/editor';
+import '@wangeditor/editor/dist/css/style.css';
 
 const route = useRoute();
 const router = useRouter();
@@ -20,6 +23,17 @@ const form = reactive({
   subject: '',
   htmlContent: ''
 });
+
+// wangEditor
+const editorRef = shallowRef();
+const handleCreated = (editor: any) => {
+  editorRef.value = editor;
+  i18nChangeLanguage('zh-CN');
+};
+const editorConfig: Partial<IEditorConfig> = {
+  placeholder: '输入模板 HTML 内容，支持 {{变量}} 语法...',
+  MENU_CONF: {}
+};
 
 async function loadTemplate() {
   if (!templateId.value) return;
@@ -66,12 +80,20 @@ onMounted(loadTemplate);
           <NInput v-model:value="form.subject" placeholder="邮件主题" />
         </NFormItem>
         <NFormItem label="HTML 内容">
-          <NInput
-            v-model:value="form.htmlContent"
-            type="textarea"
-            :autosize="{ minRows: 12, maxRows: 24 }"
-            placeholder="支持 {{变量}} 语法"
-          />
+          <div style="border: 1px solid #d9d9d9; border-radius: 4px; width: 100%;">
+            <Toolbar
+              :editor="editorRef"
+              :defaultConfig="{}"
+              style="border-bottom: 1px solid #d9d9d9;"
+            />
+            <Editor
+              @onCreated="handleCreated"
+              v-model="form.htmlContent"
+              :defaultConfig="editorConfig"
+              mode="default"
+              style="height: 500px; overflow-y: auto;"
+            />
+          </div>
         </NFormItem>
       </NForm>
     </NCard>

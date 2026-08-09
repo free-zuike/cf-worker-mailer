@@ -8,6 +8,7 @@ import { fetchTemplates, fetchTemplate, type EmailTemplate } from '@/service/api
 import { Editor, Toolbar } from '@wangeditor/editor-for-vue';
 import { i18nChangeLanguage, type IEditorConfig } from '@wangeditor/editor';
 import '@wangeditor/editor/dist/css/style.css';
+import { localStg } from '@/utils/storage';
 
 const message = useMessage();
 const themeStore = useThemeStore();
@@ -42,9 +43,11 @@ const editorConfig: Partial<IEditorConfig> = {
       fieldName: 'file',
       maxFileSize: 10 * 1024 * 1024,
       metaWithUrl: false,
-      // 单次上传图片数量限制
       maxNumberOfFiles: 5,
-      allowedFileTypes: ['image/*']
+      allowedFileTypes: ['image/*'],
+      headers: {
+        Authorization: `Bearer ${localStg.get('token') || ''}`
+      }
     },
     // 视频：通过 URL 插入
     uploadVideo: {
