@@ -142,8 +142,9 @@ onMounted(() => {
   loadPageData();
 });
 
-// 离开页面时也清理
+// 离开页面时清理 wangEditor DOM 残留
 onUnmounted(() => {
+  console.log('[compose] onUnmounted triggered');
   cleanupWangEditor();
 });
 
