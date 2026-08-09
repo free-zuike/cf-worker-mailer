@@ -37,3 +37,8 @@ export function fetchRefreshToken(refreshToken: string) {
     data: { refreshToken }
   });
 }
+
+/** 获取 GitHub OAuth 授权 URL */
+export function fetchGitHubAuthUrl() {
+  return request<{ authUrl: string }>({ url: '/auth/github' });
+}
