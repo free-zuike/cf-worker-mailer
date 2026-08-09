@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from 'vue';
+import { onMounted, reactive, ref, watch, shallowRef } from 'vue';
 import { useMessage } from 'naive-ui';
 import { sendEmail, type SendEmailParams } from '@/service/api/email';
 import { fetchSmtpConfigs, type SmtpConfig } from '@/service/api/smtp';
 import { fetchTemplates, fetchTemplate, type EmailTemplate } from '@/service/api/template';
 import { fetchContacts, type Contact } from '@/service/api/contacts';
+import { Editor, Toolbar } from '@wangeditor/editor-for-vue';
+import { i18nChangeLanguage, type IEditorConfig } from '@wangeditor/editor';
+import '@wangeditor/editor/dist/css/style.css';
 import { localStg } from '@/utils/storage';
 
 const message = useMessage();
@@ -27,6 +30,17 @@ const form = reactive({
   text: '',
   skipVariableReplace: false
 });
+
+// wangEditor
+const editorRef = shallowRef();
+const handleCreated = (editor: any) => {
+  editorRef.value = editor;
+  i18nChangeLanguage('zh-CN');
+};
+const editorConfig: Partial<IEditorConfig> = {
+  placeholder: '请输入邮件内容...',
+  MENU_CONF: {}
+};
 
 function splitEmails(v: string): string[] {
   return v.split(',').map(s => s.trim()).filter(Boolean);
@@ -165,12 +179,20 @@ function toggleContact(c: Contact, checked: boolean) {
           <NInput v-model:value="form.subject" placeholder="邮件主题" />
         </NFormItem>
         <NFormItem label="HTML 内容">
-          <NInput
-            v-model:value="form.html"
-            type="textarea"
-            :autosize="{ minRows: 12, maxRows: 24 }"
-            placeholder="支持 HTML 格式"
-          />
+          <div style="border: 1px solid #d9d9d9; border-radius: 4px; width: 100%;">
+            <Toolbar
+              :editor="editorRef"
+              :defaultConfig="{}"
+              style="border-bottom: 1px solid #d9d9d9;"
+            />
+            <Editor
+              @onCreated="handleCreated"
+              v-model="form.html"
+              :defaultConfig="editorConfig"
+              mode="default"
+              style="height: 400px; overflow-y: auto;"
+            />
+          </div>
         </NFormItem>
         <NFormItem label="纯文本内容">
           <NInput
