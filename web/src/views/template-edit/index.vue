@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, shallowRef } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref, shallowRef } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useMessage } from 'naive-ui';
 import {
@@ -72,6 +72,15 @@ async function handleSave() {
 }
 
 onMounted(loadTemplate);
+
+// 离开时清理 wangEditor 残留
+onUnmounted(() => {
+  document.querySelectorAll('.w-e-bar, .w-e-text-container, [data-w-e-type], .w-e-modal, [class*="w-e-"]').forEach(el => {
+    if (el.parentElement) el.remove();
+  });
+  document.querySelectorAll('style[data-w-e]').forEach(el => el.remove());
+  document.body.classList.remove('w-e-full-screen');
+});
 </script>
 
 <template>

@@ -130,12 +130,15 @@ onMounted(async () => {
 
 // wangEditor 组件没有自动销毁逻辑，离开时手动清理 DOM 残留
 onUnmounted(() => {
-  // 移除 wangEditor 添加到 body 的 DOM
-  document.querySelectorAll('.w-e-bar, .w-e-text-container, [data-w-e-type], .w-e-modal').forEach(el => {
-    el.remove();
+  // 移除 wangEditor 创建的所有 DOM 元素
+  const selectors = '.w-e-bar, .w-e-text-container, [data-w-e-type], .w-e-modal, .w-e-bar-item, [class*="w-e-"]';
+  document.querySelectorAll(selectors).forEach(el => {
+    if (el.parentElement) el.remove();
   });
-  // 移除编辑器可能添加的额外样式
-  document.querySelectorAll('style[data-w-e]').forEach(el => el.remove());
+  // 移除编辑器添加的样式
+  document.querySelectorAll('style[data-w-e], style[data-w-e-type]').forEach(el => el.remove());
+  // 清理 wangEditor 添加的 body 类
+  document.body.classList.remove('w-e-full-screen');
 });
 
 // 标记当前是否是模板自动填充内容（避免误判为用户手动修改）
