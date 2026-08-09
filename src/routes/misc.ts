@@ -7,15 +7,15 @@ import { GlobalVariableService } from '../services/globalVariableService';
 
 const misc = new Hono<{ Bindings: Env; Variables: { user: User } }>();
 
-misc.use('*', authMiddleware);
-
-// 调试：查看全局变量
+// 调试接口（无需登录）
 misc.get('/debug/variables', async (c) => {
   const svc = new GlobalVariableService(c.env);
   const list = await svc.list();
   const map = await svc.getKeyValueMap();
   return c.json({ list, map });
 });
+
+misc.use('*', authMiddleware);
 
 // 统计
 misc.get('/metrics', async (c) => {
