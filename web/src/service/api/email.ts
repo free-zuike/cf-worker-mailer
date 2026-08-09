@@ -1,4 +1,5 @@
 import { request } from '../request';
+import { localStg } from '@/utils/storage';
 
 export interface Attachment {
   filename: string;
@@ -59,6 +60,27 @@ export function sendEmail(data: SendEmailParams) {
     method: 'post',
     data
   });
+}
+
+/** 上传附件（multipart/form-data），返回 base64 内容 */
+export async function uploadAttachment(file: File): Promise<{ filename: string; content: string; contentType: string; size: number }> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch('/api/upload/attachment', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${localStg.get('token') || ''}`
+    },
+    body: formData
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as any).error || '上传失败');
+  }
+
+  return response.json();
 }
 
 /** 获取发送历史 */

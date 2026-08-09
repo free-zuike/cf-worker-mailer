@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref, shallowRef, watch, computed } from 'vue';
-import { useMessage } from 'naive-ui';
+import { useMessage, useDialog } from 'naive-ui';
 import { useThemeStore } from '@/store/modules/theme';
-import { sendEmail, type SendEmailParams } from '@/service/api/email';
+import { sendEmail, uploadAttachment, type SendEmailParams } from '@/service/api/email';
 import { fetchSmtpConfigs, type SmtpConfig } from '@/service/api/smtp';
 import { fetchTemplates, fetchTemplate, type EmailTemplate } from '@/service/api/template';
 import { Editor, Toolbar } from '@wangeditor/editor-for-vue';
@@ -11,6 +11,7 @@ import '@wangeditor/editor/dist/css/style.css';
 import { localStg } from '@/utils/storage';
 
 const message = useMessage();
+const dialog = useDialog();
 const themeStore = useThemeStore();
 const loading = ref(false);
 const smtpConfigs = ref<SmtpConfig[]>([]);
@@ -27,6 +28,42 @@ const form = reactive({
   html: '',
   text: ''
 });
+
+// 附件管理
+const attachments = ref<{ filename: string; content: string; contentType: string; size: number }[]>([]);
+const uploading = ref(false);
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+async function handleFileSelect() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.multiple = true;
+  input.onchange = async () => {
+    const files = Array.from(input.files || []);
+    for (const file of files) {
+      if (file.size > 20 * 1024 * 1024) {
+        message.error(`${file.name} 超过 20MB 限制`);
+        continue;
+      }
+      uploading.value = true;
+      try {
+        const result = await uploadAttachment(file);
+        attachments.value.push(result);
+        message.success(`已添加附件: ${file.name}`);
+      } catch (e: any) {
+        message.error(e.message || '上传附件失败');
+      }
+    }
+    uploading.value = false;
+  };
+  input.click();
+}
+function removeAttachment(index: number) {
+  attachments.value.splice(index, 1);
+}
 
 // wangEditor 配置
 const editorRef = shallowRef();
@@ -127,7 +164,12 @@ async function handleSend() {
     html: form.html || undefined,
     text: form.text || undefined,
     configId: form.configId || undefined,
-    templateId: form.templateId || undefined
+    templateId: form.templateId || undefined,
+    attachments: attachments.value.length > 0 ? attachments.value.map(a => ({
+      filename: a.filename,
+      content: a.content,
+      contentType: a.contentType
+    })) : undefined
   };
 
   const cc = splitEmails(ccInput.value);
@@ -221,6 +263,23 @@ async function handleSend() {
             :autosize="{ minRows: 4, maxRows: 10 }"
             placeholder="纯文本内容（可选）"
           />
+        </NFormItem>
+        <NFormItem label="附件">
+          <NSpace vertical :size="8" style="width: 100%;">
+            <NButton size="small" :loading="uploading" @click="handleFileSelect">
+              添加附件
+            </NButton>
+            <NList v-if="attachments.length > 0" size="small" :bordered="false">
+              <NListItem v-for="(att, i) in attachments" :key="i">
+                <div class="flex-y-center justify-between">
+                  <span>{{ att.filename }} ({{ formatSize(att.size) }})</span>
+                  <NButton size="tiny" quaternary circle type="error" @click="removeAttachment(i)">
+                    ✕
+                  </NButton>
+                </div>
+              </NListItem>
+            </NList>
+          </NSpace>
         </NFormItem>
       </NForm>
     </NCard>
