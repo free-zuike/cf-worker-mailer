@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref, shallowRef, watch, computed } from 'vue';
+import { onMounted, reactive, ref, shallowRef, watch, computed, onUnmounted } from 'vue';
 import { useMessage } from 'naive-ui';
 import { useThemeStore } from '@/store/modules/theme';
 import { sendEmail, type SendEmailParams } from '@/service/api/email';
@@ -127,6 +127,16 @@ onMounted(async () => {
 });
 
 // 页面不再缓存（keepAlive = false），每次进入都重新创建
+
+// wangEditor 组件没有自动销毁逻辑，离开时手动清理 DOM 残留
+onUnmounted(() => {
+  // 移除 wangEditor 添加到 body 的 DOM
+  document.querySelectorAll('.w-e-bar, .w-e-text-container, [data-w-e-type], .w-e-modal').forEach(el => {
+    el.remove();
+  });
+  // 移除编辑器可能添加的额外样式
+  document.querySelectorAll('style[data-w-e]').forEach(el => el.remove());
+});
 
 // 标记当前是否是模板自动填充内容（避免误判为用户手动修改）
 let templateFilling = false;
