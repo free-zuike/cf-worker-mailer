@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from 'vue';
+import { onMounted, reactive, ref, shallowRef, watch } from 'vue';
 import { useMessage } from 'naive-ui';
 import { sendEmail, type SendEmailParams } from '@/service/api/email';
 import { fetchSmtpConfigs, type SmtpConfig } from '@/service/api/smtp';
@@ -7,9 +7,6 @@ import { fetchTemplates, fetchTemplate, type EmailTemplate } from '@/service/api
 import { Editor, Toolbar } from '@wangeditor/editor-for-vue';
 import { i18nChangeLanguage, type IEditorConfig } from '@wangeditor/editor';
 import '@wangeditor/editor/dist/css/style.css';
-
-// wangEditor 语言设为中文
-i18nChangeLanguage('zh-CN');
 
 const message = useMessage();
 const loading = ref(false);
@@ -29,7 +26,11 @@ const form = reactive({
 });
 
 // wangEditor 配置
-const editorRef = ref<any>(null);
+const editorRef = shallowRef();
+const handleCreated = (editor: any) => {
+  editorRef.value = editor;
+  i18nChangeLanguage('zh-CN');
+};
 const editorConfig: Partial<IEditorConfig> = {
   placeholder: '请输入邮件内容...',
   MENU_CONF: {}
@@ -143,14 +144,14 @@ async function handleSend() {
           <NInput v-model:value="form.subject" placeholder="邮件主题" />
         </NFormItem>
         <NFormItem label="HTML 内容">
-          <div style="border: 1px solid #d9d9d9; border-radius: 4px;">
+          <div style="border: 1px solid #d9d9d9; border-radius: 4px; width: 100%;">
             <Toolbar
               :editor="editorRef"
               :defaultConfig="toolbarConfig"
               style="border-bottom: 1px solid #d9d9d9;"
             />
             <Editor
-              ref="editorRef"
+              @onCreated="handleCreated"
               v-model="form.html"
               :defaultConfig="editorConfig"
               mode="default"
