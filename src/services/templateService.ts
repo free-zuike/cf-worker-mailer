@@ -153,9 +153,13 @@ export class TemplateService {
       allVariables.set(key, value);
     });
 
-    // 第一步：先把 \{{ 替换为占位符，避免被替换
+    // 第一步：处理转义 —— 把 \{{ 和 &#92;{{ 替换为占位符，避免被替换
     const ESCAPED_PLACEHOLDER = '\x00ESCAPED_BRACE\x00';
-    let result = content.replace(/\\\{\{/g, ESCAPED_PLACEHOLDER);
+    let result = content
+      // wangEditor 可能把 \ 存为 HTML 实体 &#92;
+      .replace(/&#92;\{\{/g, ESCAPED_PLACEHOLDER)
+      // 也可能直接存反斜杠
+      .replace(/\\\{\{/g, ESCAPED_PLACEHOLDER);
 
     // 第二步：替换变量
     allVariables.forEach((value, key) => {
