@@ -34,7 +34,7 @@ export class GlobalVariableService {
     }>();
     return results.map(r => ({
       id: r.id,
-      key: normalizeKey(r.key),
+      key: r.key,
       defaultValue: r.default_value,
       description: r.description,
       createdAt: r.created_at,
@@ -79,7 +79,7 @@ export class GlobalVariableService {
     if (!row) return null;
     return {
       id: row.id,
-      key: normalizeKey(row.key),
+      key: row.key,
       defaultValue: row.default_value,
       description: row.description,
       createdAt: row.created_at,
