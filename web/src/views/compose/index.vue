@@ -102,7 +102,8 @@ function isHtmlEmpty(html: string): boolean {
   return stripped === '';
 }
 
-onMounted(async () => {
+// 加载页面数据
+async function loadPageData() {
   const [smtpRes, tmplRes, contactRes] = await Promise.all([
     fetchSmtpConfigs(),
     fetchTemplates(),
@@ -124,16 +125,26 @@ onMounted(async () => {
   if (!contactRes.error) {
     contacts.value = contactRes.data.contacts;
   }
-});
+}
 
 // 页面不再缓存（keepAlive = false），每次进入都重新创建
 
-// 离开页面时清理 wangEditor DOM 残留（正常路由切换，不强制刷新）
-onUnmounted(() => {
+// 每次进入 compose 页面时，先全局清理可能残留的 wangEditor DOM
+function cleanupWangEditor() {
   document.querySelectorAll('.w-e-bar, .w-e-text-container, [data-w-e-type], .w-e-modal, [class*="w-e-"]').forEach(el => {
     if (el.parentElement) el.remove();
   });
   document.body.classList.remove('w-e-full-screen');
+}
+
+onMounted(() => {
+  cleanupWangEditor();
+  loadPageData();
+});
+
+// 离开页面时也清理
+onUnmounted(() => {
+  cleanupWangEditor();
 });
 
 // 标记当前是否是模板自动填充内容（避免误判为用户手动修改）
