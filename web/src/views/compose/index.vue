@@ -152,7 +152,19 @@ onMounted(() => {
 
 onUnmounted(() => {
   removeAfterGuard();
+  // 先销毁编辑器实例
+  try {
+    if (editorRef.value && typeof editorRef.value.destroy === 'function') {
+      editorRef.value.destroy();
+    }
+  } catch {}
+  editorRef.value = null;
   cleanupWangEditor();
+  // 强制清理所有 wangEditor 可能的残留
+  document.querySelectorAll('[class*="w-e-"], [data-w-e-type], [data-w-e], .w-e-bar, .w-e-text-container, .w-e-modal').forEach(el => {
+    el.remove();
+  });
+  document.body.classList.remove('w-e-full-screen', 'w-e-body-full-screen');
 });
 
 // 标记当前是否是模板自动填充内容（避免误判为用户手动修改）
