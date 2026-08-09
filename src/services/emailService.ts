@@ -34,16 +34,22 @@ export class EmailService {
       const template = await this.templateService.get(request.templateId);
       if (template) {
         subject = template.subject;
-        // 合并全局变量 + 模板变量 + 请求变量
-        const globalVars = await this.globalVariableService.getKeyValueMap();
-        const allVars = { ...globalVars, ...(request.templateVariables || {}) };
         if (template.htmlContent) {
-          html = this.templateService.applyVariables(template.htmlContent, allVars, template.variables);
+          html = this.templateService.applyVariables(template.htmlContent, request.templateVariables || {}, template.variables);
         }
         if (template.textContent) {
-          text = this.templateService.applyVariables(template.textContent, allVars, template.variables);
+          text = this.templateService.applyVariables(template.textContent, request.templateVariables || {}, template.variables);
         }
       }
+    }
+
+    // 无论是否使用模板，都对最终内容做全局变量替换
+    const globalVars = await this.globalVariableService.getKeyValueMap();
+    if (html) {
+      html = this.templateService.applyVariables(html, { ...globalVars, ...(request.templateVariables || {}) });
+    }
+    if (text) {
+      text = this.templateService.applyVariables(text, { ...globalVars, ...(request.templateVariables || {}) });
     }
 
     const toEmails = Array.isArray(request.to) ? request.to : [request.to];
