@@ -51,9 +51,11 @@ export default defineConfig(configEnv => {
           manualChunks(id: string) {
             if (id.includes('node_modules/vue') || id.includes('node_modules/@vue')) return 'vue';
             if (id.includes('node_modules/naive-ui')) return 'naive';
-            if (id.includes('node_modules/echarts')) return 'echarts';
+            if (id.includes('node_modules/@wangeditor')) return 'wangeditor';
             if (id.includes('node_modules/@iconify')) return 'icons';
             if (id.includes('node_modules/@sa/')) return 'utils';
+            // 把其他 node_modules 也拆成独立 chunk，避免 index 过大
+            if (id.includes('node_modules/')) return 'vendor';
           }
         }
       }
