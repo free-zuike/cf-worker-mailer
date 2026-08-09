@@ -33,7 +33,8 @@ upload.post('/image', async (c) => {
       httpMetadata: { contentType: file.type }
     });
 
-    const url = `/api/uploads/${key}`;
+    const origin = new URL(c.req.url).origin;
+    const url = `${origin}/api/uploads/${key}`;
     return c.json({ errno: 0, data: { url } });
   } catch (error) {
     console.error('Upload error:', error);
