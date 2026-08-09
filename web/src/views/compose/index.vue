@@ -1,19 +1,13 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, reactive, ref, shallowRef, watch, computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { useMessage } from 'naive-ui';
-import { useThemeStore } from '@/store/modules/theme';
 import { sendEmail, type SendEmailParams } from '@/service/api/email';
 import { fetchSmtpConfigs, type SmtpConfig } from '@/service/api/smtp';
 import { fetchTemplates, fetchTemplate, type EmailTemplate } from '@/service/api/template';
 import { fetchContacts, type Contact } from '@/service/api/contacts';
-import { Editor, Toolbar } from '@wangeditor/editor-for-vue';
-import { i18nChangeLanguage, type IEditorConfig } from '@wangeditor/editor';
-import '@wangeditor/editor/dist/css/style.css';
 import { localStg } from '@/utils/storage';
 
 const message = useMessage();
-const themeStore = useThemeStore();
 const loading = ref(false);
 const smtpConfigs = ref<SmtpConfig[]>([]);
 const templates = ref<EmailTemplate[]>([]);
@@ -32,60 +26,6 @@ const form = reactive({
   html: '',
   text: '',
   skipVariableReplace: false
-});
-
-// wangEditor 配置
-const editorRef = shallowRef();
-const handleCreated = (editor: any) => {
-  editorRef.value = editor;
-  i18nChangeLanguage('zh-CN');
-};
-const editorConfig: Partial<IEditorConfig> = {
-  placeholder: '请输入邮件内容...',
-  MENU_CONF: {
-    // 图片上传到 R2
-    uploadImage: {
-      server: '/api/upload/image',
-      fieldName: 'file',
-      maxFileSize: 10 * 1024 * 1024,
-      metaWithUrl: false,
-      maxNumberOfFiles: 5,
-      allowedFileTypes: ['image/*'],
-      headers: {
-        Authorization: `Bearer ${localStg.get('token') || ''}`
-      }
-    },
-    // 视频：通过 URL 插入
-    uploadVideo: {
-      allowedFileTypes: ['video/mp4']
-    }
-  } as any
-};
-
-const toolbarConfig = {};
-
-// 编辑器主题：跟随项目主题
-const editorTheme = computed(() => themeStore.darkMode ? 'dark' : 'light');
-
-// 全屏控制：容器 ref 和切换函数
-const editorWrapperRef = ref<HTMLDivElement | null>(null);
-const isFullScreen = ref(false);
-function toggleFullScreen() {
-  const el = editorWrapperRef.value;
-  if (!el) return;
-  if (!isFullScreen.value) {
-    el.requestFullscreen?.();
-    isFullScreen.value = true;
-  } else {
-    document.exitFullscreen?.();
-    isFullScreen.value = false;
-  }
-}
-// 监听退出全屏事件（ESC 或系统退出）
-watch(isFullScreen, (val) => {
-  if (!val) return;
-  const onExit = () => { isFullScreen.value = false; };
-  document.addEventListener('fullscreenchange', onExit, { once: true });
 });
 
 function splitEmails(value: string): string[] {
@@ -130,41 +70,12 @@ async function loadPageData() {
 
 // 页面不再缓存（keepAlive = false），每次进入都重新创建
 
-// 每次进入 compose 页面时，先全局清理可能残留的 wangEditor DOM
-function cleanupWangEditor() {
-  document.querySelectorAll('.w-e-bar, .w-e-text-container, [data-w-e-type], .w-e-modal, [class*="w-e-"]').forEach(el => {
-    if (el.parentElement) el.remove();
-  });
-  document.body.classList.remove('w-e-full-screen');
-}
-
-// 离开 compose 页面时，在路由切换完成后清理 wangEditor 残留
-const router = useRouter();
-const removeAfterGuard = router.afterEach(() => {
-  cleanupWangEditor();
-  setTimeout(() => cleanupWangEditor(), 50);
-});
-
 onMounted(() => {
-  cleanupWangEditor();
   loadPageData();
 });
 
 onUnmounted(() => {
-  removeAfterGuard();
-  // 先销毁编辑器实例
-  try {
-    if (editorRef.value && typeof editorRef.value.destroy === 'function') {
-      editorRef.value.destroy();
-    }
-  } catch {}
-  editorRef.value = null;
-  cleanupWangEditor();
-  // 强制清理所有 wangEditor 可能的残留
-  document.querySelectorAll('[class*="w-e-"], [data-w-e-type], [data-w-e], .w-e-bar, .w-e-text-container, .w-e-modal').forEach(el => {
-    el.remove();
-  });
-  document.body.classList.remove('w-e-full-screen', 'w-e-body-full-screen');
+  // 不做任何清理
 });
 
 // 标记当前是否是模板自动填充内容（避免误判为用户手动修改）
@@ -308,31 +219,12 @@ function toggleContact(c: Contact, checked: boolean) {
           <NInput v-model:value="form.subject" placeholder="邮件主题" />
         </NFormItem>
         <NFormItem label="HTML 内容">
-          <div
-            ref="editorWrapperRef"
-            class="editor-wrapper"
-            :class="{ 'editor-fullscreen': isFullScreen }"
-          >
-            <div class="editor-toolbar-row">
-              <NButton size="small" quaternary circle @click="toggleFullScreen">
-                <template #icon>
-                  <span class="text-16px">{{ isFullScreen ? '⤡' : '⤢' }}</span>
-                </template>
-              </NButton>
-            </div>
-            <Toolbar
-              :editor="editorRef"
-              :defaultConfig="toolbarConfig"
-              style="border-bottom: 1px solid #d9d9d9;"
-            />
-            <Editor
-              @onCreated="handleCreated"
-              v-model="form.html"
-              :defaultConfig="editorConfig"
-              mode="default"
-              style="height: 400px; overflow-y: auto;"
-            />
-          </div>
+          <NInput
+            v-model:value="form.html"
+            type="textarea"
+            :autosize="{ minRows: 15, maxRows: 30 }"
+            placeholder="支持 HTML 格式"
+          />
         </NFormItem>
         <NFormItem label="纯文本内容">
           <NInput
@@ -373,75 +265,3 @@ function toggleContact(c: Contact, checked: boolean) {
     </template>
   </NModal>
 </template>
-
-<!-- wangEditor 暗色主题适配 & 全屏修复 -->
-<style>
-/* 编辑器外部容器 */
-.editor-wrapper {
-  border: 1px solid #d9d9d9;
-  border-radius: 4px;
-  width: 100%;
-  position: relative;
-}
-
-/* 编辑器全屏模式 */
-.editor-wrapper.editor-fullscreen {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background: #fff;
-  border: none;
-  border-radius: 0;
-  display: flex;
-  flex-direction: column;
-}
-.editor-wrapper.editor-fullscreen .w-e-text-container {
-  flex: 1;
-  height: auto !important;
-}
-html.dark .editor-wrapper.editor-fullscreen {
-  background: #1e1e1e;
-}
-
-/* 全屏工具栏行（含全屏按钮） */
-.editor-toolbar-row {
-  display: flex;
-  justify-content: flex-end;
-  padding: 2px 4px;
-  background: #f5f5f5;
-  border-bottom: 1px solid #e8e8e8;
-}
-html.dark .editor-toolbar-row {
-  background: #2a2a2a;
-  border-color: #333;
-}
-
-/* 暗色模式适配 */
-html.dark .w-e-bar {
-  background-color: #1e1e1e;
-  border-color: #333;
-}
-html.dark .w-e-bar-item button {
-  color: #ccc;
-}
-html.dark .w-e-bar-item button:hover {
-  background-color: #333;
-  color: #fff;
-}
-html.dark .w-e-text-container {
-  background-color: #1e1e1e;
-  color: #ccc;
-}
-html.dark .w-e-text-container [data-slate-editor] {
-  background-color: #1e1e1e;
-  color: #ccc;
-}
-html.dark .w-e-modal {
-  background-color: #2a2a2a;
-  border-color: #444;
-  color: #ccc;
-}
-html.dark .w-e-modal .btn-primary {
-  background-color: #409eff;
-}
-</style>
