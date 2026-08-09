@@ -36,13 +36,18 @@ const handleCreated = (editor: any) => {
 const editorConfig: Partial<IEditorConfig> = {
   placeholder: '请输入邮件内容...',
   MENU_CONF: {
-    // 图片：小于 50MB 的图片直接转 base64 嵌入，无需后端
+    // 图片上传到 R2
     uploadImage: {
-      base64LimitSize: 50 * 1024 * 1024
+      server: '/api/upload/image',
+      fieldName: 'file',
+      maxFileSize: 10 * 1024 * 1024,
+      metaWithUrl: false,
+      // 单次上传图片数量限制
+      maxNumberOfFiles: 5,
+      allowedFileTypes: ['image/*']
     },
     // 视频：通过 URL 插入
     uploadVideo: {
-      // 允许视频 URL 输入
       allowedFileTypes: ['video/mp4']
     }
   } as any

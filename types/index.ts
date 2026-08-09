@@ -190,6 +190,8 @@ export interface Env {
   DB: D1Database;
   MAIL_QUEUE: Queue;
   ASSETS: { fetch: (request: Request) => Promise<Response> };
+  /** R2 存储桶，用于图片/文件上传 */
+  R2_UPLOAD_BUCKET: R2Bucket;
   ADMIN_PASSWORD?: string;
   ADMIN_EMAIL?: string;
   ALLOWED_ORIGINS?: string;

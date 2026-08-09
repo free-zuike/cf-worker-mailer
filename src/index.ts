@@ -46,6 +46,18 @@ app.get('/health', async (c) => {
 // API 路由
 app.route('/api', api);
 
+// 提供 R2 上传的文件
+app.get('/api/uploads/*', async (c) => {
+  const key = c.req.path.replace('/api/', '');
+  const object = await c.env.R2_UPLOAD_BUCKET.get(key);
+  if (!object) return c.json({ error: 'File not found' }, 404);
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  headers.set('etag', object.httpEtag);
+  headers.set('Cache-Control', 'public, max-age=31536000');
+  return new Response(object.body, { headers });
+});
+
 // 静态资源（前端）- 访问首页时自动初始化数据库
 app.get('*', async (c) => {
   try {

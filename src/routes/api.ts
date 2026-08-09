@@ -7,6 +7,7 @@ import emails from './emails';
 import settings from './settings';
 import user from './user';
 import misc from './misc';
+import upload from './upload';
 
 const api = new Hono<{ Bindings: Env; Variables: { user: User } }>();
 
@@ -17,5 +18,6 @@ api.route('/emails', emails);
 api.route('/settings', settings);
 api.route('/user', user);
 api.route('/', misc);
+api.route('/upload', upload);
 
 export default api;
