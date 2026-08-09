@@ -92,7 +92,8 @@ export class GlobalVariableService {
     const list = await this.list();
     const map: Record<string, string> = {};
     for (const v of list) {
-      map[v.key] = v.defaultValue;
+      // 确保 key 不带花括号，兼容旧数据
+      map[normalizeKey(v.key)] = v.defaultValue;
     }
     return map;
   }
