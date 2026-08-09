@@ -5,8 +5,7 @@ import { useMessage } from 'naive-ui';
 import {
   fetchTemplate,
   createTemplate,
-  updateTemplate,
-  type TemplateVariable
+  updateTemplate
 } from '@/service/api/template';
 import { Editor, Toolbar } from '@wangeditor/editor-for-vue';
 import { i18nChangeLanguage, type IEditorConfig } from '@wangeditor/editor';
@@ -23,8 +22,7 @@ const form = reactive({
   name: '',
   subject: '',
   htmlContent: '',
-  textContent: '',
-  variables: [] as TemplateVariable[]
+  textContent: ''
 });
 
 // wangEditor
@@ -47,7 +45,6 @@ async function loadTemplate() {
     form.subject = data.template.subject;
     form.htmlContent = data.template.htmlContent || '';
     form.textContent = data.template.textContent || '';
-    form.variables = data.template.variables || [];
   }
   loading.value = false;
 }
@@ -61,18 +58,6 @@ async function handleSave() {
     message.success('保存成功');
     router.push('/templates');
   }
-}
-
-// 变量管理
-const newVar = reactive({ key: '', defaultValue: '', description: '' });
-function addVariable() {
-  if (!newVar.key.trim()) { message.warning('请输入变量名'); return; }
-  if (form.variables.some(v => v.key === newVar.key.trim())) { message.warning('变量名已存在'); return; }
-  form.variables.push({ key: newVar.key.trim(), defaultValue: newVar.defaultValue, description: newVar.description });
-  newVar.key = ''; newVar.defaultValue = ''; newVar.description = '';
-}
-function removeVariable(index: number) {
-  form.variables.splice(index, 1);
 }
 
 onMounted(loadTemplate);
@@ -120,30 +105,10 @@ onMounted(loadTemplate);
             placeholder="纯文本版本（可选，用于不支持 HTML 的邮件客户端）"
           />
         </NFormItem>
-        <NFormItem label="模板变量">
-          <NSpace vertical :size="12" style="width: 100%;">
-            <NAlert type="info" :bordered="false" v-if="form.variables.length === 0">
-              <span v-pre>在内容中使用 {{变量名}} 占位符，发送时可替换为实际值</span>
-            </NAlert>
-            <NList v-if="form.variables.length > 0" size="small" :bordered="true">
-              <NListItem v-for="(v, i) in form.variables" :key="i">
-                <div class="flex-y-center justify-between">
-                  <div>
-                    <span class="font-medium"><span v-pre>{{</span>{{ v.key }}<span v-pre>}}</span></span>
-                    <span class="text-#999"> - {{ v.defaultValue || '无默认值' }}</span>
-                  </div>
-                  <NButton size="tiny" quaternary circle type="error" @click="removeVariable(i)">✕</NButton>
-                </div>
-              </NListItem>
-            </NList>
-            <NFormItem label="">
-              <div class="w-full flex-y-center gap-8px">
-                <NInput v-model:value="newVar.key" placeholder="变量名，如 name" style="width: 140px;" />
-                <NInput v-model:value="newVar.defaultValue" placeholder="默认值" style="flex: 1;" />
-                <NButton size="small" type="primary" @click="addVariable">添加</NButton>
-              </div>
-            </NFormItem>
-          </NSpace>
+        <NFormItem label="变量说明">
+          <NAlert type="info" :bordered="false">
+            <span v-pre>在内容中使用 {{变量名}} 引用全局变量，在「全局变量」页面统一管理。</span>
+          </NAlert>
         </NFormItem>
       </NForm>
     </NCard>
