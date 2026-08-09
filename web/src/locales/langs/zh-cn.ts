@@ -233,6 +233,7 @@ const local: App.I18n.Schema = {
     history: '发送历史',
     settings: '系统设置',
     'global-variables': '全局变量',
+    contacts: '联系人',
     'oauth-callback': 'OAuth 回调'
   },
   page: {

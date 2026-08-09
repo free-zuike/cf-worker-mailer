@@ -27,6 +27,23 @@ export async function initDatabase(env: Env) {
           )
         `).run();
       }
+      // 检查 contacts 表
+      const contactsTable = await env.DB.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='contacts'"
+      ).first();
+      if (!contactsTable) {
+        console.log('Creating contacts table...');
+        await env.DB.prepare(`
+          CREATE TABLE contacts (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL,
+            remark TEXT,
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+          )
+        `).run();
+      }
       return;
     }
 
@@ -113,6 +130,17 @@ export async function initDatabase(env: Env) {
         key TEXT NOT NULL UNIQUE,
         default_value TEXT NOT NULL,
         description TEXT,
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      )
+    `).run();
+
+    await env.DB.prepare(`
+      CREATE TABLE contacts (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL,
+        remark TEXT,
         created_at TEXT NOT NULL, updated_at TEXT NOT NULL
       )
     `).run();

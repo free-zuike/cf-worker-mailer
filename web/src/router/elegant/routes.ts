@@ -51,6 +51,17 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
+    name: 'contacts',
+    path: '/contacts',
+    component: 'layout.base$view.contacts',
+    meta: {
+      title: 'contacts',
+      i18nKey: 'route.contacts',
+      order: 8,
+      icon: 'mdi:book-account-outline'
+    }
+  },
+  {
     name: 'global-variables',
     path: '/global-variables',
     component: 'layout.base$view.global-variables',

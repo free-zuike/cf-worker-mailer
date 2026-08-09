@@ -21,6 +21,7 @@ declare module "@elegant-router/types" {
     "404": "/404";
     "500": "/500";
     "compose": "/compose";
+    "contacts": "/contacts";
     "global-variables": "/global-variables";
     "history": "/history";
     "home": "/home";
@@ -66,6 +67,7 @@ declare module "@elegant-router/types" {
     | "404"
     | "500"
     | "compose"
+    | "contacts"
     | "global-variables"
     | "history"
     | "home"
@@ -98,6 +100,7 @@ declare module "@elegant-router/types" {
     | "iframe-page"
     | "login"
     | "compose"
+    | "contacts"
     | "global-variables"
     | "history"
     | "home"

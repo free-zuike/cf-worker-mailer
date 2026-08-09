@@ -35,6 +35,7 @@ export function setupElegantRouter() {
         templates: { order: 4, icon: 'mdi:file-document-outline' },
         history: { order: 5, icon: 'mdi:history' },
         'global-variables': { order: 7, icon: 'mdi:variable' },
+        contacts: { order: 8, icon: 'mdi:book-account-outline' },
         settings: { order: 6, icon: 'mdi:cog-outline' }
       };
 

@@ -237,6 +237,7 @@ const local: App.I18n.Schema = {
     history: 'Email History',
     settings: 'Settings',
     'global-variables': 'Global Variables',
+    contacts: 'Contacts',
     'oauth-callback': 'OAuth Callback'
   },
   page: {
