@@ -143,10 +143,12 @@ onMounted(() => {
   loadPageData();
 });
 
-// 离开 compose 页面时，先清理 wangEditor，再用完整页面导航避免空白页
+// 离开 compose 页面时，正常路由切换并清理 wangEditor（不刷新）
 onBeforeRouteLeave((to, from, next) => {
   cleanupWangEditor();
-  window.location.href = to.fullPath;
+  // 延迟清理，确保路由切换完成后移除残留
+  setTimeout(() => cleanupWangEditor(), 0);
+  next();
 });
 
 // 标记当前是否是模板自动填充内容（避免误判为用户手动修改）
