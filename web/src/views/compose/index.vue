@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, reactive, ref, shallowRef, watch, computed } from 'vue';
+import { onMounted, onUnmounted, onActivated, onDeactivated, reactive, ref, shallowRef, watch, computed } from 'vue';
+import { onBeforeRouteLeave } from 'vue-router';
 import { useMessage } from 'naive-ui';
 import { useThemeStore } from '@/store/modules/theme';
 import { sendEmail, type SendEmailParams } from '@/service/api/email';
@@ -119,11 +120,29 @@ onMounted(async () => {
 });
 
 // 离开页面时销毁编辑器，防止空白页
+function destroyEditor() {
+  try {
+    if (editorRef.value) {
+      if (typeof editorRef.value.destroy === 'function') {
+        editorRef.value.destroy();
+      }
+      editorRef.value = null;
+    }
+  } catch {}
+}
+
+// 页面被缓存时（keep-alive）不销毁，恢复时重新初始化
+onActivated(() => {
+  // 编辑器在 keep-alive 恢复时自动重建
+});
+onDeactivated(() => {
+  destroyEditor();
+});
+onBeforeRouteLeave(() => {
+  destroyEditor();
+});
 onUnmounted(() => {
-  if (editorRef.value) {
-    try { editorRef.value.destroy(); } catch {}
-    editorRef.value = null;
-  }
+  destroyEditor();
 });
 
 // 标记当前是否是模板自动填充内容（避免误判为用户手动修改）
