@@ -21,7 +21,8 @@ const loading = ref(false);
 const form = reactive({
   name: '',
   subject: '',
-  htmlContent: ''
+  htmlContent: '',
+  textContent: ''
 });
 
 // wangEditor
@@ -43,6 +44,7 @@ async function loadTemplate() {
     form.name = data.template.name;
     form.subject = data.template.subject;
     form.htmlContent = data.template.htmlContent || '';
+    form.textContent = data.template.textContent || '';
   }
   loading.value = false;
 }
@@ -94,6 +96,14 @@ onMounted(loadTemplate);
               style="height: 500px; overflow-y: auto;"
             />
           </div>
+        </NFormItem>
+        <NFormItem label="纯文本内容">
+          <NInput
+            v-model:value="form.textContent"
+            type="textarea"
+            :autosize="{ minRows: 6, maxRows: 16 }"
+            placeholder="纯文本版本（可选，用于不支持 HTML 的邮件客户端）"
+          />
         </NFormItem>
       </NForm>
     </NCard>
