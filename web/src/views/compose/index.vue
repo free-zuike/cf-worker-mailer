@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, reactive, ref, shallowRef, watch, computed } from 'vue';
+import { onBeforeRouteLeave } from 'vue-router';
 import { useMessage } from 'naive-ui';
 import { useThemeStore } from '@/store/modules/theme';
 import { sendEmail, type SendEmailParams } from '@/service/api/email';
@@ -142,10 +143,10 @@ onMounted(() => {
   loadPageData();
 });
 
-// 离开页面时清理 wangEditor DOM 残留
-onUnmounted(() => {
-  console.log('[compose] onUnmounted triggered');
+// 离开 compose 页面时，先清理 wangEditor，再用完整页面导航避免空白页
+onBeforeRouteLeave((to, from, next) => {
   cleanupWangEditor();
+  window.location.href = to.fullPath;
 });
 
 // 标记当前是否是模板自动填充内容（避免误判为用户手动修改）
