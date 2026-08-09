@@ -16,6 +16,8 @@ declare namespace StorageType {
     token: string;
     /** 上次发送邮件的收件人 */
     lastTo: string;
+    /** 上次使用的发件配置 ID */
+    lastConfigId: string;
     /** Fixed sider with mix-menu */
     mixSiderFixed: CommonType.YesOrNo;
     /** The refresh token */

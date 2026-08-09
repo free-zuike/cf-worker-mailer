@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, onActivated, onDeactivated, reactive, ref, shallowRef, watch, computed } from 'vue';
-import { onBeforeRouteLeave } from 'vue-router';
+import { onMounted, reactive, ref, shallowRef, watch, computed, onActivated } from 'vue';
 import { useMessage } from 'naive-ui';
 import { useThemeStore } from '@/store/modules/theme';
 import { sendEmail, type SendEmailParams } from '@/service/api/email';
@@ -110,6 +109,13 @@ onMounted(async () => {
   ]);
   if (!smtpRes.error) {
     smtpConfigs.value = smtpRes.data.configs;
+    // 自动填入 SMTP 配置：只有一个则直接用，否则用上次使用的
+    const lastConfigId = localStg.get('lastConfigId');
+    if (smtpConfigs.value.length === 1) {
+      form.configId = smtpConfigs.value[0].id;
+    } else if (lastConfigId && smtpConfigs.value.some(c => c.id === lastConfigId)) {
+      form.configId = lastConfigId;
+    }
   }
   if (!tmplRes.error) {
     templates.value = tmplRes.data.templates;
@@ -119,30 +125,13 @@ onMounted(async () => {
   }
 });
 
-// 离开页面时销毁编辑器，防止空白页
-function destroyEditor() {
-  try {
-    if (editorRef.value) {
-      if (typeof editorRef.value.destroy === 'function') {
-        editorRef.value.destroy();
-      }
-      editorRef.value = null;
-    }
-  } catch {}
-}
-
-// 页面被缓存时（keep-alive）不销毁，恢复时重新初始化
+// 页面重新激活时（keep-alive 从缓存恢复），重新读取上次收件人和发件配置
 onActivated(() => {
-  // 编辑器在 keep-alive 恢复时自动重建
-});
-onDeactivated(() => {
-  destroyEditor();
-});
-onBeforeRouteLeave(() => {
-  destroyEditor();
-});
-onUnmounted(() => {
-  destroyEditor();
+  toInput.value = localStg.get('lastTo') || toInput.value;
+  const lastConfigId = localStg.get('lastConfigId');
+  if (lastConfigId && smtpConfigs.value.some(c => c.id === lastConfigId)) {
+    form.configId = lastConfigId;
+  }
 });
 
 // 标记当前是否是模板自动填充内容（避免误判为用户手动修改）
@@ -202,8 +191,9 @@ async function handleSend() {
   loading.value = true;
   const { error } = await sendEmail(payload);
   if (!error) {
-    // 保存本次收件人，下次打开自动填入
+    // 保存本次收件人和发件配置，下次打开自动填入
     localStg.set('lastTo', toInput.value);
+    localStg.set('lastConfigId', form.configId || '');
     message.success('邮件已发送');
     toInput.value = '';
     ccInput.value = '';
@@ -211,6 +201,8 @@ async function handleSend() {
     form.subject = '';
     form.html = '';
     form.text = '';
+    form.configId = null;
+    form.templateId = null;
   }
   loading.value = false;
 }
