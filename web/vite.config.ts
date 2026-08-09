@@ -49,10 +49,8 @@ export default defineConfig(configEnv => {
       rollupOptions: {
         output: {
           manualChunks(id: string) {
-            if (id.includes('node_modules/naive-ui')) return 'naive';
+            // wangeditor 按需加载（只在 compose 和模板编辑页使用）
             if (id.includes('node_modules/@wangeditor')) return 'wangeditor';
-            // 其他所有第三方库合并成一个 lib chunk，减少请求数
-            if (id.includes('node_modules/')) return 'lib';
           }
         }
       }
