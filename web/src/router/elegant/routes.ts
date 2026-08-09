@@ -51,6 +51,17 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
+    name: 'global-variables',
+    path: '/global-variables',
+    component: 'layout.base$view.global-variables',
+    meta: {
+      title: 'global-variables',
+      i18nKey: 'route.global-variables',
+      order: 7,
+      icon: 'mdi:variable'
+    }
+  },
+  {
     name: 'history',
     path: '/history',
     component: 'layout.base$view.history',

@@ -236,6 +236,7 @@ const local: App.I18n.Schema = {
     'template-edit': 'Template Editor',
     history: 'Email History',
     settings: 'Settings',
+    'global-variables': 'Global Variables',
     'oauth-callback': 'OAuth Callback'
   },
   page: {

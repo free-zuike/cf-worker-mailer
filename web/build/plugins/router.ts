@@ -34,6 +34,7 @@ export function setupElegantRouter() {
         smtp: { order: 3, icon: 'mdi:server' },
         templates: { order: 4, icon: 'mdi:file-document-outline' },
         history: { order: 5, icon: 'mdi:history' },
+        'global-variables': { order: 7, icon: 'mdi:variable' },
         settings: { order: 6, icon: 'mdi:cog-outline' }
       };
 

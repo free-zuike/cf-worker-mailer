@@ -7,6 +7,7 @@ import type {
 } from '../../types';
 import { SmtpService } from './smtpService';
 import { TemplateService } from './templateService';
+import { GlobalVariableService } from './globalVariableService';
 import { WorkerMailer } from 'worker-mailer';
 
 export class EmailService {
@@ -14,12 +15,14 @@ export class EmailService {
   private userId: string;
   private smtpService: SmtpService;
   private templateService: TemplateService;
+  private globalVariableService: GlobalVariableService;
 
   constructor(env: Env, userId: string) {
     this.env = env;
     this.userId = userId;
     this.smtpService = new SmtpService(env, userId);
     this.templateService = new TemplateService(env, userId);
+    this.globalVariableService = new GlobalVariableService(env);
   }
 
   async sendEmail(request: EmailRequest): Promise<EmailResponse> {
@@ -31,11 +34,14 @@ export class EmailService {
       const template = await this.templateService.get(request.templateId);
       if (template) {
         subject = template.subject;
+        // 合并全局变量 + 模板变量 + 请求变量
+        const globalVars = await this.globalVariableService.getKeyValueMap();
+        const allVars = { ...globalVars, ...(request.templateVariables || {}) };
         if (template.htmlContent) {
-          html = this.templateService.applyVariables(template.htmlContent, request.templateVariables || {}, template.variables);
+          html = this.templateService.applyVariables(template.htmlContent, allVars, template.variables);
         }
         if (template.textContent) {
-          text = this.templateService.applyVariables(template.textContent, request.templateVariables || {}, template.variables);
+          text = this.templateService.applyVariables(template.textContent, allVars, template.variables);
         }
       }
     }

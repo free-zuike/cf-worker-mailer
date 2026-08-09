@@ -21,6 +21,7 @@ declare module "@elegant-router/types" {
     "404": "/404";
     "500": "/500";
     "compose": "/compose";
+    "global-variables": "/global-variables";
     "history": "/history";
     "home": "/home";
     "iframe-page": "/iframe-page/:url";
@@ -65,6 +66,7 @@ declare module "@elegant-router/types" {
     | "404"
     | "500"
     | "compose"
+    | "global-variables"
     | "history"
     | "home"
     | "iframe-page"
@@ -96,6 +98,7 @@ declare module "@elegant-router/types" {
     | "iframe-page"
     | "login"
     | "compose"
+    | "global-variables"
     | "history"
     | "home"
     | "oauth-callback"

@@ -232,6 +232,7 @@ const local: App.I18n.Schema = {
     'template-edit': '模板编辑',
     history: '发送历史',
     settings: '系统设置',
+    'global-variables': '全局变量',
     'oauth-callback': 'OAuth 回调'
   },
   page: {
