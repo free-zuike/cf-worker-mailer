@@ -35,7 +35,17 @@ const handleCreated = (editor: any) => {
 };
 const editorConfig: Partial<IEditorConfig> = {
   placeholder: '请输入邮件内容...',
-  MENU_CONF: {}
+  MENU_CONF: {
+    // 图片：小于 50MB 的图片直接转 base64 嵌入，无需后端
+    uploadImage: {
+      base64LimitSize: 50 * 1024 * 1024
+    },
+    // 视频：通过 URL 插入
+    uploadVideo: {
+      // 允许视频 URL 输入
+      allowedFileTypes: ['video/mp4']
+    }
+  } as any
 };
 
 const toolbarConfig = {};
