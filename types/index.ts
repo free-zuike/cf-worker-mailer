@@ -110,6 +110,8 @@ export interface EmailRequest {
   attachments?: Attachment[];
   configId?: string;
   async?: boolean;
+  /** 设为 true 时不替换全局变量 */
+  skipVariableReplace?: boolean;
 }
 
 export interface Attachment {

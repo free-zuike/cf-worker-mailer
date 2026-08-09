@@ -20,6 +20,7 @@ export interface SendEmailParams {
   attachments?: Attachment[];
   configId?: string;
   async?: boolean;
+  skipVariableReplace?: boolean;
 }
 
 export interface SendEmailResponse {

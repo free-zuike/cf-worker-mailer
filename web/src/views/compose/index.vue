@@ -29,7 +29,8 @@ const form = reactive({
   templateId: null as string | null,
   subject: '',
   html: '',
-  text: ''
+  text: '',
+  skipVariableReplace: false
 });
 
 // wangEditor 配置
@@ -173,7 +174,8 @@ async function handleSend() {
     html: isHtmlEmpty(form.html) ? undefined : (form.html || undefined),
     text: form.text || undefined,
     configId: form.configId || undefined,
-    templateId: form.templateId || undefined
+    templateId: form.templateId || undefined,
+    skipVariableReplace: form.skipVariableReplace || undefined
   };
 
   const cc = splitEmails(ccInput.value);
@@ -300,6 +302,11 @@ function toggleContact(c: Contact, checked: boolean) {
             :autosize="{ minRows: 4, maxRows: 10 }"
             placeholder="纯文本内容（可选）"
           />
+        </NFormItem>
+        <NFormItem label="">
+          <NCheckbox v-model:checked="form.skipVariableReplace">
+            <span v-pre>不替换变量（保留 {{name}} 原样）</span>
+          </NCheckbox>
         </NFormItem>
       </NForm>
     </NCard>

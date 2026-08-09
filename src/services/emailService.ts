@@ -52,6 +52,17 @@ export class EmailService {
       text = this.templateService.applyVariables(text, { ...globalVars, ...(request.templateVariables || {}) });
     }
 
+    // 全局变量替换（除非明确要求跳过）
+    if (!request.skipVariableReplace) {
+      const globalVars = await this.globalVariableService.getKeyValueMap();
+      if (html) {
+        html = this.templateService.applyVariables(html, { ...globalVars, ...(request.templateVariables || {}) });
+      }
+      if (text) {
+        text = this.templateService.applyVariables(text, { ...globalVars, ...(request.templateVariables || {}) });
+      }
+    }
+
     const toEmails = Array.isArray(request.to) ? request.to : [request.to];
     const ccEmails = request.cc ? (Array.isArray(request.cc) ? request.cc : [request.cc]) : undefined;
     const bccEmails = request.bcc ? (Array.isArray(request.bcc) ? request.bcc : [request.bcc]) : undefined;
