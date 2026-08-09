@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref, shallowRef, watch } from 'vue';
+import { onMounted, reactive, ref, shallowRef, watch, computed } from 'vue';
 import { useMessage } from 'naive-ui';
+import { useThemeStore } from '@/store/modules/theme';
 import { sendEmail, type SendEmailParams } from '@/service/api/email';
 import { fetchSmtpConfigs, type SmtpConfig } from '@/service/api/smtp';
 import { fetchTemplates, fetchTemplate, type EmailTemplate } from '@/service/api/template';
@@ -9,6 +10,7 @@ import { i18nChangeLanguage, type IEditorConfig } from '@wangeditor/editor';
 import '@wangeditor/editor/dist/css/style.css';
 
 const message = useMessage();
+const themeStore = useThemeStore();
 const loading = ref(false);
 const smtpConfigs = ref<SmtpConfig[]>([]);
 const templates = ref<EmailTemplate[]>([]);
@@ -37,6 +39,9 @@ const editorConfig: Partial<IEditorConfig> = {
 };
 
 const toolbarConfig = {};
+
+// 编辑器主题：跟随项目主题
+const editorTheme = computed(() => themeStore.darkMode ? 'dark' : 'light');
 
 function splitEmails(value: string): string[] {
   return value.split(',').map(s => s.trim()).filter(Boolean);
@@ -171,3 +176,45 @@ async function handleSend() {
     </NCard>
   </NSpace>
 </template>
+
+<!-- wangEditor 暗色主题适配 & 全屏修复 -->
+<style>
+/* 全屏模式下工具栏固定 */
+.w-e-full-screen .w-e-bar {
+  position: sticky;
+  top: 0;
+  z-index: 999;
+}
+
+/* 暗色模式适配 */
+html.dark .w-e-bar {
+  background-color: #1e1e1e;
+  border-color: #333;
+}
+html.dark .w-e-bar-item button {
+  color: #ccc;
+}
+html.dark .w-e-bar-item button:hover {
+  background-color: #333;
+  color: #fff;
+}
+html.dark .w-e-text-container {
+  background-color: #1e1e1e;
+  color: #ccc;
+}
+html.dark .w-e-text-container .w-e-scroll {
+  background-color: #1e1e1e;
+}
+html.dark .w-e-text-container [data-slate-editor] {
+  background-color: #1e1e1e;
+  color: #ccc;
+}
+html.dark .w-e-modal {
+  background-color: #2a2a2a;
+  border-color: #444;
+  color: #ccc;
+}
+html.dark .w-e-modal .btn-primary {
+  background-color: #409eff;
+}
+</style>
