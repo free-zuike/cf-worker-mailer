@@ -139,7 +139,7 @@ export class TemplateService {
     }));
   }
 
-  /** 将变量渲染进模板内容 */
+  /** 将变量渲染进模板内容。使用 `\{{变量名}}` 可保留原文不替换 */
   applyVariables(
     content: string,
     variables: Record<string, string>,
@@ -153,10 +153,17 @@ export class TemplateService {
       allVariables.set(key, value);
     });
 
-    let result = content;
+    // 第一步：先把 \{{ 替换为占位符，避免被替换
+    const ESCAPED_PLACEHOLDER = '\x00ESCAPED_BRACE\x00';
+    let result = content.replace(/\\\{\{/g, ESCAPED_PLACEHOLDER);
+
+    // 第二步：替换变量
     allVariables.forEach((value, key) => {
       result = result.replace(new RegExp(`{{${key}}}`, 'g'), value);
     });
+
+    // 第三步：占位符恢复为 {{
+    result = result.replace(new RegExp(ESCAPED_PLACEHOLDER, 'g'), '{{');
 
     return result;
   }
