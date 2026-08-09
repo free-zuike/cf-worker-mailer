@@ -11,6 +11,22 @@ export async function initDatabase(env: Env) {
     ).first();
 
     if (usersTable) {
+      // 检查新增的表是否存在，不存在则创建
+      const globalVarsTable = await env.DB.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='global_variables'"
+      ).first();
+      if (!globalVarsTable) {
+        console.log('Creating global_variables table...');
+        await env.DB.prepare(`
+          CREATE TABLE global_variables (
+            id TEXT PRIMARY KEY,
+            key TEXT NOT NULL UNIQUE,
+            default_value TEXT NOT NULL,
+            description TEXT,
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+          )
+        `).run();
+      }
       return;
     }
 
