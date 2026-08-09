@@ -4,14 +4,6 @@ import type { Env, User } from '../../types';
 /** 简单的内存速率限制器（每个 Worker 实例独立） */
 const requestCounts = new Map<string, { count: number; resetAt: number }>();
 
-// 每 5 分钟清理过期记录
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, val] of requestCounts) {
-    if (val.resetAt < now) requestCounts.delete(key);
-  }
-}, 300_000);
-
 /**
  * 速率限制中间件
  * @param limit 限制次数
@@ -22,6 +14,13 @@ export function rateLimit(limit = 60, windowMs = 60_000) {
     const userId = c.get('user')?.id || 'anonymous';
     const now = Date.now();
     const key = `${userId}:${Math.floor(now / windowMs)}`;
+
+    // 惰性清理：删除已过期的记录，防止内存无限增长
+    if (requestCounts.size > 1000) {
+      for (const [k, v] of requestCounts) {
+        if (v.resetAt < now) requestCounts.delete(k);
+      }
+    }
 
     const record = requestCounts.get(key);
     if (!record || record.resetAt < now) {
