@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref, shallowRef, watch, computed } from 'vue';
-import { useMessage, useDialog } from 'naive-ui';
+import { onMounted, onUnmounted, reactive, ref, shallowRef, watch, computed } from 'vue';
+import { useMessage } from 'naive-ui';
 import { useThemeStore } from '@/store/modules/theme';
 import { sendEmail, type SendEmailParams } from '@/service/api/email';
 import { fetchSmtpConfigs, type SmtpConfig } from '@/service/api/smtp';
@@ -12,7 +12,6 @@ import '@wangeditor/editor/dist/css/style.css';
 import { localStg } from '@/utils/storage';
 
 const message = useMessage();
-const dialog = useDialog();
 const themeStore = useThemeStore();
 const loading = ref(false);
 const smtpConfigs = ref<SmtpConfig[]>([]);
@@ -91,6 +90,17 @@ function splitEmails(value: string): string[] {
   return value.split(',').map(s => s.trim()).filter(Boolean);
 }
 
+// 判断 HTML 是否为空（去除空标签和空白）
+function isHtmlEmpty(html: string): boolean {
+  if (!html) return true;
+  const stripped = html
+    .replace(/<[^>]*>/g, '')  // 去掉所有标签
+    .replace(/&nbsp;/g, '')   // 去掉不换行空格
+    .replace(/&nbsp;/gi, '')
+    .trim();
+  return stripped === '';
+}
+
 onMounted(async () => {
   const [smtpRes, tmplRes, contactRes] = await Promise.all([
     fetchSmtpConfigs(),
@@ -108,14 +118,36 @@ onMounted(async () => {
   }
 });
 
+// 离开页面时销毁编辑器，防止空白页
+onUnmounted(() => {
+  if (editorRef.value) {
+    try { editorRef.value.destroy(); } catch {}
+    editorRef.value = null;
+  }
+});
+
+// 标记当前是否是模板自动填充内容（避免误判为用户手动修改）
+let templateFilling = false;
+
 // 选中模板时填充主题和内容
 watch(() => form.templateId, async (templateId) => {
   if (!templateId) return;
+  templateFilling = true;
   const { data, error } = await fetchTemplate(templateId);
   if (!error && data) {
     form.subject = data.template.subject;
     form.html = data.template.htmlContent || '';
     form.text = data.template.textContent || '';
+  }
+  templateFilling = false;
+});
+
+// 用户清空 HTML 编辑器内容时，自动取消模板选择（避免发送时仍用模板内容）
+watch(() => form.html, () => {
+  if (templateFilling) return;
+  const empty = !form.html || form.html === '<p><br></p>';
+  if (empty && form.templateId) {
+    form.templateId = null;
   }
 });
 
@@ -133,7 +165,7 @@ async function handleSend() {
   const payload: SendEmailParams = {
     to,
     subject: form.subject,
-    html: form.html || undefined,
+    html: isHtmlEmpty(form.html) ? undefined : (form.html || undefined),
     text: form.text || undefined,
     configId: form.configId || undefined,
     templateId: form.templateId || undefined
