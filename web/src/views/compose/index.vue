@@ -256,6 +256,23 @@ async function handleSend() {
             />
           </div>
         </NFormItem>
+        <NFormItem label="附件">
+          <NSpace vertical :size="8" style="width: 100%;">
+            <NButton size="small" :loading="uploading" @click="handleFileSelect">
+              添加附件
+            </NButton>
+            <NList v-if="attachments.length > 0" size="small" :bordered="false">
+              <NListItem v-for="(att, i) in attachments" :key="i">
+                <div class="flex-y-center justify-between">
+                  <span>{{ att.filename }} ({{ formatSize(att.size) }})</span>
+                  <NButton size="tiny" quaternary circle type="error" @click="removeAttachment(i)">
+                    ✕
+                  </NButton>
+                </div>
+              </NListItem>
+            </NList>
+          </NSpace>
+        </NFormItem>
         <NFormItem label="纯文本内容">
           <NInput
             v-model:value="form.text"
