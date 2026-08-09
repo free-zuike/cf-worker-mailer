@@ -2,12 +2,13 @@ import { Hono } from 'hono';
 import type { Env, User } from '../../types';
 import { authMiddleware } from '../middleware/auth';
 import { EmailService } from '../services/emailService';
+import { rateLimit } from '../middleware/rateLimit';
 
 const emails = new Hono<{ Bindings: Env; Variables: { user: User } }>();
 
 emails.use('*', authMiddleware);
 
-emails.post('/', async (c) => {
+emails.post('/', rateLimit(20, 60_000), async (c) => {
   const user = c.get('user');
   const data = await c.req.json();
   const emailService = new EmailService(c.env, user.id);

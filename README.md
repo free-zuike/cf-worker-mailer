@@ -10,12 +10,18 @@
 
 ## 功能特性
 
-- 用户注册/登录
-- SMTP 配置管理
-- 邮件模板管理
-- 邮件发送（支持同步/异步）
-- 发送历史查看
+- 用户注册/登录（支持邮箱+密码、GitHub OAuth 登录）
+- 人机验证（Cloudflare Turnstile）
+- SMTP 配置管理（支持 SMTP 和 MailChannels）
+- 邮件模板管理（支持变量替换）
+- 富文本编辑器（wangEditor，支持图片上传到 R2）
+- 邮件发送（支持 HTML / 纯文本 / 附件）
+- 发送历史查看 + HTML 预览
+- 发送失败重试
 - 统计面板
+- 管理员系统设置
+- 多语言支持（中/英）
+- 暗色/亮色主题切换
 
 ## 本地开发
 
@@ -85,7 +91,27 @@ npx wrangler d1 create worker-mailer-db
 npx wrangler d1 migrations apply worker-mailer-db
 ```
 
-### 4. 部署
+### 5. 创建 R2 存储桶（用于图片/附件上传）
+
+```bash
+npx wrangler r2 bucket create worker-mailer-uploads
+```
+
+### 6. 设置环境变量
+
+```bash
+# 加密密钥（必填，用于 SMTP 密码加密）
+npx wrangler secret put ENCRYPTION_KEY
+
+# 人机验证（可选，需要 Cloudflare Turnstile）
+npx wrangler secret put TURNSTILE_SECRET_KEY
+
+# GitHub OAuth（可选，需要 GitHub OAuth App）
+npx wrangler secret put GITHUB_CLIENT_ID
+npx wrangler secret put GITHUB_CLIENT_SECRET
+```
+
+### 7. 部署
 
 ```bash
 npm run deploy
