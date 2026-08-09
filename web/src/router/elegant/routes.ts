@@ -47,7 +47,8 @@ export const generatedRoutes: GeneratedRoute[] = [
       title: 'compose',
       i18nKey: 'route.compose',
       order: 2,
-      icon: 'mdi:email-plus-outline'
+      icon: 'mdi:email-plus-outline',
+      keepAlive: false
     }
   },
   {
@@ -156,7 +157,8 @@ export const generatedRoutes: GeneratedRoute[] = [
     meta: {
       title: 'template-edit',
       i18nKey: 'route.template-edit',
-      hideInMenu: true
+      hideInMenu: true,
+      keepAlive: false
     }
   },
   {

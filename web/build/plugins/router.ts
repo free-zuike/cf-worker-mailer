@@ -57,6 +57,11 @@ export function setupElegantRouter() {
         meta.icon = menuConfig[key].icon;
       }
 
+      // 使用富文本编辑器的页面，禁止缓存避免空白页
+      if (key === 'compose' || key === 'template-edit') {
+        meta.keepAlive = false;
+      }
+
       return meta;
     }
   });

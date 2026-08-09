@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref, shallowRef, watch, computed, onActivated } from 'vue';
+import { onMounted, reactive, ref, shallowRef, watch, computed } from 'vue';
 import { useMessage } from 'naive-ui';
 import { useThemeStore } from '@/store/modules/theme';
 import { sendEmail, type SendEmailParams } from '@/service/api/email';
@@ -125,14 +125,7 @@ onMounted(async () => {
   }
 });
 
-// 页面重新激活时（keep-alive 从缓存恢复），重新读取上次收件人和发件配置
-onActivated(() => {
-  toInput.value = localStg.get('lastTo') || toInput.value;
-  const lastConfigId = localStg.get('lastConfigId');
-  if (lastConfigId && smtpConfigs.value.some(c => c.id === lastConfigId)) {
-    form.configId = lastConfigId;
-  }
-});
+// 页面不再缓存（keepAlive = false），每次进入都重新创建
 
 // 标记当前是否是模板自动填充内容（避免误判为用户手动修改）
 let templateFilling = false;
