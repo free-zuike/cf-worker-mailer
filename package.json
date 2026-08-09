@@ -7,9 +7,9 @@
   "scripts": {
     "dev": "cd web && pnpm dev",
     "dev:worker": "wrangler dev",
-    "build": "cd web && CI=true npx -y pnpm@10 build",
+    "build": "cd web && CI=true npx -y pnpm@10 install && npx -y pnpm@10 build",
     "build:worker": "wrangler deploy --dry-run",
-    "deploy": "cd web && CI=true npx -y pnpm@10 build && cd .. && wrangler deploy",
+    "deploy": "cd web && CI=true npx -y pnpm@10 install && npx -y pnpm@10 build && cd .. && wrangler deploy",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
