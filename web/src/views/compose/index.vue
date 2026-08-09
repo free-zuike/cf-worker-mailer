@@ -39,7 +39,18 @@ const handleCreated = (editor: any) => {
 };
 const editorConfig: Partial<IEditorConfig> = {
   placeholder: '请输入邮件内容...',
-  MENU_CONF: {}
+  MENU_CONF: {
+    // 图片上传到 R2
+    uploadImage: {
+      server: '/api/upload/image',
+      fieldName: 'file',
+      maxFileSize: 10 * 1024 * 1024,
+      allowedFileTypes: ['image/*'],
+      headers: {
+        Authorization: `Bearer ${localStg.get('token') || ''}`
+      }
+    }
+  } as any
 };
 
 function splitEmails(v: string): string[] {
@@ -233,3 +244,34 @@ function toggleContact(c: Contact, checked: boolean) {
     </NModal>
   </NSpace>
 </template>
+
+<style>
+/* 暗色模式适配 wangEditor */
+html.dark .w-e-bar {
+  background-color: #1e1e1e;
+  border-color: #333;
+}
+html.dark .w-e-bar-item button {
+  color: #ccc;
+}
+html.dark .w-e-bar-item button:hover {
+  background-color: #333;
+  color: #fff;
+}
+html.dark .w-e-text-container {
+  background-color: #1e1e1e;
+  color: #ccc;
+}
+html.dark .w-e-text-container [data-slate-editor] {
+  background-color: #1e1e1e;
+  color: #ccc;
+}
+html.dark .w-e-modal {
+  background-color: #2a2a2a;
+  border-color: #444;
+  color: #ccc;
+}
+html.dark .w-e-modal .btn-primary {
+  background-color: #409eff;
+}
+</style>
