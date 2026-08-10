@@ -94,7 +94,7 @@ export function generateToken(): string {
   return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-export async function generateApiKey(): Promise<{ key: string; hash: string }> {
+export async function createApiKeyToken(): Promise<{ key: string; hash: string }> {
   const key = 'wk_' + generateToken();
   const encoder = new TextEncoder();
   const data = encoder.encode(key);

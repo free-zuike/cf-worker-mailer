@@ -30,8 +30,13 @@ misc.post('/api-key/generate', async (c) => {
   const user = c.get('user');
   const { name, expiresInDays } = await c.req.json().catch(() => ({}));
   const userService = new UserService(c.env);
-  const result = await userService.generateApiKey(user.id, String(name || 'default'), expiresInDays ? Number(expiresInDays) : undefined);
-  return c.json(result, 201);
+  try {
+    const result = await userService.generateApiKey(user.id, String(name || 'default'), expiresInDays ? Number(expiresInDays) : undefined);
+    return c.json(result, 201);
+  } catch (error) {
+    console.error('Generate API key error:', error);
+    return c.json({ error: (error as Error).message || '生成失败' }, 500);
+  }
 });
 
 // 列出 API Key

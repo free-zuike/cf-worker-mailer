@@ -1,5 +1,5 @@
 import type { Env, User, UserToken } from '../../types';
-import { hashPassword, verifyPassword, generateToken, generateApiKey } from '../utils/password';
+import { hashPassword, verifyPassword, generateToken, createApiKeyToken } from '../utils/password';
 
 export class UserService {
   private env: Env;
@@ -340,7 +340,22 @@ export class UserService {
 
   // 生成 API Key（支持名称和有效期）
   async generateApiKey(userId: string, name: string = 'default', expiresInDays?: number): Promise<{ id: string; key: string; expiresAt: string | null }> {
-    const { key, hash } = await generateApiKey();
+    // 确保表存在
+    try {
+      await this.env.DB.prepare("SELECT 1 FROM api_keys LIMIT 1").first();
+    } catch {
+      await this.env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS api_keys (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          key_hash TEXT NOT NULL,
+          expires_at INTEGER,
+          created_at TEXT NOT NULL
+        )
+      `).run();
+    }
+    const { key, hash } = await createApiKeyToken();
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
     const expiresAt = expiresInDays ? Date.now() + expiresInDays * 86400_000 : null;
