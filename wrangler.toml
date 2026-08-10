@@ -44,7 +44,7 @@ bucket_name = "worker-mailer-uploads"
 # ------------------------------------------
 [[queues]]
 binding = "MAIL_QUEUE"
-queue_name = "cf-worker-mailer-queue"
+queue_name = "mailer-queue"
 
 # ------------------------------------------
 # Workers 日志和监控
