@@ -85,6 +85,15 @@ inbox.post('/email/:id/star', async (c) => {
   return c.json({ starred });
 });
 
+// 移动邮件到其他文件夹
+inbox.post('/email/:id/move', async (c) => {
+  const svc = new InboxService(c.env, c.get('user').id);
+  const { targetFolder } = await c.req.json();
+  if (!targetFolder) return c.json({ error: '目标文件夹不能为空' }, 400);
+  await svc.moveEmail(c.req.param('id'), targetFolder);
+  return c.json({ success: true });
+});
+
 // 搜索邮件（支持文件夹筛选）
 inbox.get('/search/:configId', async (c) => {
   const svc = new InboxService(c.env, c.get('user').id);

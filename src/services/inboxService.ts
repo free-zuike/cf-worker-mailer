@@ -357,6 +357,38 @@ export class InboxService {
     await this.env.DB.prepare('UPDATE inbox_emails SET starred = ? WHERE id = ?').bind(newVal, id).run();
     return !!newVal;
   }
+
+  /** 移动邮件到其他文件夹 */
+  async moveEmail(id: string, targetFolder: string): Promise<void> {
+    const row = await this.env.DB.prepare(
+      'SELECT account_id, uid, folder FROM inbox_emails WHERE id = ? AND user_id = ?'
+    ).bind(id, this.userId).first<any>();
+    if (!row) throw new Error('邮件不存在');
+
+    // 更新 D1 文件夹
+    await this.env.DB.prepare('UPDATE inbox_emails SET folder = ? WHERE id = ?').bind(targetFolder, id).run();
+
+    // 尝试在 IMAP 服务器上移动（后台非阻塞）
+    this.moveOnServer(row.account_id, row.uid, row.folder, targetFolder).catch(() => {});
+  }
+
+  private async moveOnServer(accountId: string, uid: number, sourceFolder: string, targetFolder: string): Promise<void> {
+    try {
+      const full = await this.smtpService.getFullConfig(accountId);
+      if (!full || !full.config.imapHost) return;
+      const imap = this.createImap(full, full.imapPassword || full.password);
+      await imap.connect();
+      await imap.selectFolder(sourceFolder);
+      // COPY to target, then mark as deleted in source
+      await imap.copy(targetFolder, `${uid}`, true);
+      // 标记为删除（不实际删除，只是标记）
+      try { await imap.storeFlags(`${uid}`, ['Deleted'], 'add', true); } catch {}
+      await imap.logout().catch(() => {});
+    } catch (e) {
+      console.error('Failed to move email on server:', e);
+    }
+  }
+
   async searchEmails(accountId: string, query: string, page: number = 1, pageSize: number = 20): Promise<{ emails: InboxEmail[]; total: number }> {
     return this.listEmails(accountId, 'ALL', page, pageSize, query);
   }

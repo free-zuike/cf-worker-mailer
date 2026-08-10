@@ -72,6 +72,11 @@ export function toggleInboxStar(id: string) {
   return request<{ starred: boolean }>({ url: `/inbox/email/${id}/star`, method: 'post' });
 }
 
+// 移动邮件
+export function moveInboxEmail(id: string, targetFolder: string) {
+  return request<{ success: boolean }>({ url: `/inbox/email/${id}/move`, method: 'post', data: { targetFolder } });
+}
+
 // 搜索
 export function searchInboxEmails(configId: string, q: string, page = 1, pageSize = 20) {
   return request<{ emails: InboxEmail[]; total: number }>({ url: `/inbox/search/${configId}`, params: { q, page, pageSize } });

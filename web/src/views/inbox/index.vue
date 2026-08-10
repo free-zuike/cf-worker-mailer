@@ -2,7 +2,7 @@
 import { onMounted, onUnmounted, ref, computed } from 'vue';
 import { useMessage } from 'naive-ui';
 import { useRouter } from 'vue-router';
-import { fetchInboxConfigs, fetchInboxEmails, fetchInboxEmailFull, deleteInboxEmail, syncInbox, fetchInboxFolders, markInboxEmailRead, markInboxEmailUnread, toggleInboxStar, searchInboxEmails, type InboxEmail, type InboxFolder } from '@/service/api/inbox';
+import { fetchInboxConfigs, fetchInboxEmails, fetchInboxEmailFull, deleteInboxEmail, syncInbox, fetchInboxFolders, markInboxEmailRead, markInboxEmailUnread, toggleInboxStar, searchInboxEmails, moveInboxEmail, type InboxEmail, type InboxFolder } from '@/service/api/inbox';
 import type { SmtpConfig } from '@/service/api/smtp';
 
 const message = useMessage();
@@ -165,29 +165,58 @@ async function handleDelete(id: string) {
   }
 }
 
-// 回复
+// 回复（带原文引用，标准邮件格式）
 function reply() {
   if (!detailEmail.value) return;
-  const to = detailEmail.value.from;
-  const subject = detailEmail.value.subject.startsWith('Re:') ? detailEmail.value.subject : `Re: ${detailEmail.value.subject}`;
-  const body = detailEmail.value.text || detailEmail.value.html || '';
+  const e = detailEmail.value;
+  const to = e.from;
+  const subject = e.subject.startsWith('Re:') ? e.subject : `Re: ${e.subject}`;
+  const original = e.text || stripHtmlBasic(e.html || '') || '';
+  const date = formatFullDate(e.internalDate);
+  const quote = `\n\n\n${date} ${e.from} 写道:\n> ${original.split('\n').join('\n> ')}`;
   router.push({
     path: '/compose',
-    query: { to, subject, replyBody: body }
+    query: { to, subject, replyBody: quote }
   });
   showDetail.value = false;
 }
 
-// 转发
+// 转发（带完整邮件头）
 function forward() {
   if (!detailEmail.value) return;
-  const subject = detailEmail.value.subject.startsWith('Fwd:') ? detailEmail.value.subject : `Fwd: ${detailEmail.value.subject}`;
-  const body = detailEmail.value.text || detailEmail.value.html || '';
+  const e = detailEmail.value;
+  const subject = e.subject.startsWith('Fwd:') ? e.subject : `Fwd: ${e.subject}`;
+  const original = e.text || stripHtmlBasic(e.html || '') || '';
+  const header = `\n\n\n-------- 转发的邮件 --------\n主题: ${e.subject}\n日期: ${formatFullDate(e.internalDate)}\n发件人: ${e.from}\n收件人: ${e.to}\n抄送: ${e.cc || '无'}\n\n${original}`;
   router.push({
     path: '/compose',
-    query: { subject, forwardBody: body }
+    query: { subject, forwardBody: header }
   });
   showDetail.value = false;
+}
+
+// 移动邮件
+async function moveToFolder(targetFolder: string) {
+  if (!detailEmail.value) return;
+  const { error } = await moveInboxEmail(detailEmail.value.id, targetFolder);
+  if (!error) {
+    message.success(`已移动到 ${targetFolder}`);
+    emails.value = emails.value.filter(e => e.id !== detailEmail.value!.id);
+    total.value--;
+    showDetail.value = false;
+  } else {
+    message.error('移动失败');
+  }
+}
+
+function stripHtmlBasic(html: string) {
+  return html.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').trim();
+}
+
+function formatFullDate(dateStr: string) {
+  try {
+    return new Date(dateStr).toLocaleString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  } catch { return dateStr; }
 }
 
 function formatDate(dateStr: string) {
@@ -305,6 +334,10 @@ function downloadAttachment(index: string | number) {
             <NButton @click="toggleRead(detailEmail!)">{{ detailEmail?.isRead ? '标为未读' : '标为已读' }}</NButton>
             <NButton @click="reply">回复</NButton>
             <NButton @click="forward">转发</NButton>
+            <NPopselect :options="folderTabs.filter(f => f.value !== detailEmail?.folder).map(f => ({ label: f.label, value: f.value }))"
+              @update:value="v => moveToFolder(String(v))">
+              <NButton>移动到</NButton>
+            </NPopselect>
             <NButton type="error" @click="handleDelete(detailEmail!.id); showDetail = false;">删除</NButton>
           </NSpace>
           <NButton @click="showDetail = false">关闭</NButton>
