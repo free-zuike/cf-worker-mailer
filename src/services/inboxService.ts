@@ -50,7 +50,7 @@ export class InboxService {
     const syncedUids = await this.getSyncedUids(configId);
     let synced = 0, errors = 0;
 
-    const batchSize = 50;
+    const batchSize = 10;
     for (let start = 1; start <= totalMessages; start += batchSize) {
       const end = Math.min(start + batchSize - 1, totalMessages);
       try {
@@ -66,8 +66,17 @@ export class InboxService {
           }
         }
       } catch (e) {
-        console.error('Failed to fetch batch', start, '-', end, ':', e);
+        console.error('Batch failed, reconnecting...', start, '-', end, ':', e);
         errors++;
+        // 断开后重新连接，从下一批继续
+        try { await imap.logout(); } catch {}
+        try {
+          await imap.connect();
+          await imap.selectFolder('INBOX');
+        } catch (reconnectErr) {
+          console.error('Reconnect failed, aborting sync:', reconnectErr);
+          break;
+        }
       }
     }
 
