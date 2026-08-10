@@ -27,8 +27,7 @@ const form = reactive({
   templateId: null as string | null,
   subject: '',
   html: '',
-  text: '',
-  skipVariableReplace: false
+  text: ''
 });
 
 // wangEditor
@@ -129,8 +128,7 @@ async function handleSend() {
     html: form.html || undefined,
     text: form.text || undefined,
     configId: form.configId || undefined,
-    templateId: form.templateId || undefined,
-    skipVariableReplace: form.skipVariableReplace || undefined
+    templateId: form.templateId || undefined
   };
 
   const cc = splitEmails(ccInput.value);
@@ -252,11 +250,6 @@ function toggleContact(c: Contact, checked: boolean) {
             :autosize="{ minRows: 4, maxRows: 10 }"
             placeholder="纯文本内容（可选）"
           />
-        </NFormItem>
-        <NFormItem label="">
-          <NCheckbox v-model:checked="form.skipVariableReplace">
-            <span v-pre>不替换变量（保留 {{name}} 原样）。用 {{{{name}}}} 可单个变量不替换</span>
-          </NCheckbox>
         </NFormItem>
       </NForm>
     </NCard>

@@ -162,14 +162,7 @@ export class TemplateService {
     // 第一步：处理转义——把不替换的变量标记为占位符
     let result = content
       // 双括号逃逸：{{{{name}}}} → 保留为 {{name}} 不替换
-      .replace(/{{{{([^}]+)}}}}/g, (_, name) => ESC_OPEN + name + ESC_CLOSE)
-      // 全角括号 ｛｛name｝｝ → 用不同占位符标记左右括号
-      .replace(/｛｛/g, ESC_OPEN)
-      .replace(/｝｝/g, ESC_CLOSE)
-      // wangEditor 可能把 \ 存为 HTML 实体 &#92;
-      .replace(/&#92;\{\{/g, ESC_OPEN)
-      // 也可能直接存反斜杠
-      .replace(/\\\{\{/g, ESC_OPEN);
+      .replace(/{{{{([^}]+)}}}}/g, (_, name) => ESC_OPEN + name + ESC_CLOSE);
 
     // 第二步：替换变量
     allVariables.forEach((value, key) => {
