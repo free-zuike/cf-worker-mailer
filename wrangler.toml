@@ -7,6 +7,10 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
+# 智能部署：靠近后端服务（减少 IMAP 连接延迟）
+[placement]
+mode = "smart"
+
 # ------------------------------------------
 # 静态资源（前端构建产物）
 # ------------------------------------------
@@ -49,8 +53,9 @@ queue = "mailer-queue"
 [[queues.consumers]]
 queue = "mailer-queue"
 max_batch_size = 10
-max_batch_timeout = 30
-max_retries = 3
+max_batch_timeout = 60
+max_retries = 5
+retry_delay = 30
 
 # ------------------------------------------
 # Workers 日志和监控
