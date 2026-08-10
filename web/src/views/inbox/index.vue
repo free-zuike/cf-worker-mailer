@@ -176,6 +176,10 @@ function stripHtml(html: string) {
           <div class="text-14px mt-4px" :class="{ 'font-500': !email.isRead }">{{ email.subject || '无主题' }}</div>
           <div class="text-12px text-#999 mt-2px truncate">{{ email.text ? email.text.substring(0, 100) : (email.html ? stripHtml(email.html) : '') }}</div>
         </div>
+
+        <div class="flex-y-center justify-center mt-16px" v-if="total > 0">
+          <NPagination :page="page" :page-size="20" :item-count="total" @update:page="p => { page = p; loadEmails(); }" />
+        </div>
       </NSpin>
     </NCard>
 
