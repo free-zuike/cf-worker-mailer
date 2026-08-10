@@ -142,7 +142,7 @@ async function handleSend() {
     localStg.set('lastTo', toInput.value);
     localStg.set('lastConfigId', form.configId || '');
     message.success('邮件已发送');
-    toInput.value = '';
+    // 保留收件人，方便连续发送；清空其他字段
     ccInput.value = '';
     bccInput.value = '';
     form.subject = '';
