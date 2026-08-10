@@ -25,11 +25,16 @@ export class InboxService {
     if (!full) throw new Error('配置不存在');
     if (!full.config.imapHost) throw new Error('该配置未设置 IMAP 收件服务器');
 
+    const password = full.imapPassword || full.password;
+    if (!full.config.username || !password) {
+      throw new Error('IMAP 用户名或密码为空，请在发件配置中检查 SMTP 密码和 IMAP 授权码');
+    }
+
     const imap = new CFImap({
       host: full.config.imapHost,
       port: full.config.imapPort || 993,
       tls: full.config.imapUseTls !== false,
-      auth: { username: full.config.username, password: full.imapPassword || full.password }
+      auth: { username: full.config.username, password }
     });
 
     await imap.connect();
