@@ -118,18 +118,6 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
-    name: 'inbox-account',
-    path: '/inbox-account',
-    component: 'layout.base$view.inbox-account',
-    meta: {
-      title: 'inbox-account',
-      i18nKey: 'route.inbox-account',
-      hideInMenu: true,
-      order: 3,
-      icon: 'mdi:email-account'
-    }
-  },
-  {
     name: 'login',
     path: '/login/:module(pwd-login|code-login|register|reset-pwd|bind-wechat)?',
     component: 'layout.base$view.login',

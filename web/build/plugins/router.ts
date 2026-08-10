@@ -26,13 +26,12 @@ export function setupElegantRouter() {
 
       const constantRoutes: RouteKey[] = ['login', '403', '404', '500'];
 
-      const hideInMenuRoutes: RouteKey[] = ['login', '403', '404', '500', 'template-edit', 'oauth-callback', 'iframe-page', 'inbox-account'];
+      const hideInMenuRoutes: RouteKey[] = ['login', '403', '404', '500', 'template-edit', 'oauth-callback', 'iframe-page'];
 
       const menuConfig: Record<string, { order: number; icon: string }> = {
         home: { order: 1, icon: 'mdi:monitor-dashboard' },
         compose: { order: 2, icon: 'mdi:email-plus-outline' },
         inbox: { order: 3, icon: 'mdi:email-open-outline' },
-        'inbox-account': { order: 3, icon: 'mdi:email-account' },
         smtp: { order: 4, icon: 'mdi:server' },
         templates: { order: 5, icon: 'mdi:file-document-outline' },
         history: { order: 6, icon: 'mdi:history' },

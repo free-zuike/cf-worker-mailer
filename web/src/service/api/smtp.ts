@@ -12,6 +12,9 @@ export interface SmtpConfig {
   fromName?: string;
   secure: boolean;
   enabled: boolean;
+  imapHost?: string;
+  imapPort?: number;
+  imapUseTls?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -27,6 +30,9 @@ export interface CreateSmtpConfigParams {
   fromName?: string;
   secure?: boolean;
   enabled?: boolean;
+  imapHost?: string;
+  imapPort?: number;
+  imapUseTls?: boolean;
 }
 
 export interface UpdateSmtpConfigParams {
@@ -40,6 +46,9 @@ export interface UpdateSmtpConfigParams {
   fromName?: string;
   secure?: boolean;
   enabled?: boolean;
+  imapHost?: string;
+  imapPort?: number;
+  imapUseTls?: boolean;
 }
 
 /** 获取 SMTP 配置列表 */

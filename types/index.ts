@@ -31,6 +31,10 @@ export interface SmtpConfig {
   fromName?: string;
   secure: boolean;
   enabled: boolean;
+  /** IMAP 收件服务器（可选，填了则支持收件） */
+  imapHost?: string;
+  imapPort?: number;
+  imapUseTls?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -46,6 +50,9 @@ export interface CreateSmtpConfigRequest {
   fromName?: string;
   secure?: boolean;
   enabled?: boolean;
+  imapHost?: string;
+  imapPort?: number;
+  imapUseTls?: boolean;
 }
 
 export interface UpdateSmtpConfigRequest {
@@ -59,6 +66,9 @@ export interface UpdateSmtpConfigRequest {
   fromName?: string;
   secure?: boolean;
   enabled?: boolean;
+  imapHost?: string;
+  imapPort?: number;
+  imapUseTls?: boolean;
 }
 
 // ==================== 邮件模板相关类型 ====================

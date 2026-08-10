@@ -7,56 +7,26 @@ const inbox = new Hono<{ Bindings: Env; Variables: { user: User } }>();
 
 inbox.use('*', authMiddleware);
 
-// ============ 账户管理 ============
-
-// 列出所有 IMAP 账户
-inbox.get('/accounts', async (c) => {
+// 获取支持 IMAP 的 SMTP 配置列表
+inbox.get('/configs', async (c) => {
   const svc = new InboxService(c.env, c.get('user').id);
-  const accounts = await svc.listAccounts();
-  return c.json({ accounts });
+  const configs = await svc.getImapEnabledConfigs();
+  return c.json({ configs });
 });
 
-// 创建 IMAP 账户
-inbox.post('/accounts', async (c) => {
-  const data = await c.req.json();
-  if (!data.name || !data.host || !data.port || !data.username || !data.password) {
-    return c.json({ error: '名称、服务器、端口、用户名、密码为必填项' }, 400);
-  }
+// 同步某个 SMTP 配置的收件箱
+inbox.post('/sync/:configId', async (c) => {
   const svc = new InboxService(c.env, c.get('user').id);
-  const account = await svc.createAccount(data);
-  return c.json({ account }, 201);
-});
-
-// 更新 IMAP 账户
-inbox.put('/accounts/:id', async (c) => {
-  const data = await c.req.json();
-  const svc = new InboxService(c.env, c.get('user').id);
-  const account = await svc.updateAccount(c.req.param('id'), data);
-  return c.json({ account });
-});
-
-// 删除 IMAP 账户
-inbox.delete('/accounts/:id', async (c) => {
-  const svc = new InboxService(c.env, c.get('user').id);
-  await svc.deleteAccount(c.req.param('id'));
-  return c.json({ success: true });
-});
-
-// 同步 IMAP 账户
-inbox.post('/accounts/:id/sync', async (c) => {
-  const svc = new InboxService(c.env, c.get('user').id);
-  const result = await svc.syncAccount(c.req.param('id'));
+  const result = await svc.syncByConfigId(c.req.param('configId'));
   return c.json(result);
 });
 
-// ============ 邮件管理 ============
-
 // 列出邮件
-inbox.get('/emails/:accountId', async (c) => {
+inbox.get('/emails/:configId', async (c) => {
   const svc = new InboxService(c.env, c.get('user').id);
   const page = parseInt(c.req.query('page') || '1');
   const pageSize = parseInt(c.req.query('pageSize') || '20');
-  const result = await svc.listEmails(c.req.param('accountId'), page, pageSize);
+  const result = await svc.listEmails(c.req.param('configId'), page, pageSize);
   return c.json(result);
 });
 
@@ -75,17 +45,10 @@ inbox.delete('/email/:id', async (c) => {
   return c.json({ success: true });
 });
 
-// 标记为已读
-inbox.post('/email/:id/read', async (c) => {
-  const svc = new InboxService(c.env, c.get('user').id);
-  await svc.markAsRead(c.req.param('id'));
-  return c.json({ success: true });
-});
-
 // 未读数
-inbox.get('/unread/:accountId', async (c) => {
+inbox.get('/unread/:configId', async (c) => {
   const svc = new InboxService(c.env, c.get('user').id);
-  const count = await svc.getUnreadCount(c.req.param('accountId'));
+  const count = await svc.getUnreadCount(c.req.param('configId'));
   return c.json({ count });
 });
 

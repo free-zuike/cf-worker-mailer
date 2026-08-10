@@ -2,36 +2,38 @@
 import { onMounted, ref, computed } from 'vue';
 import { useMessage } from 'naive-ui';
 import { useRouter } from 'vue-router';
-import { fetchInboxAccounts, fetchInboxEmails, fetchInboxEmail, deleteInboxEmail, markInboxEmailRead, type InboxAccount, type InboxEmail } from '@/service/api/inbox';
+import { fetchInboxConfigs, fetchInboxEmails, fetchInboxEmail, deleteInboxEmail, syncInbox, type InboxEmail } from '@/service/api/inbox';
+import type { SmtpConfig } from '@/service/api/smtp';
 
 const message = useMessage();
 const router = useRouter();
 
-const accounts = ref<InboxAccount[]>([]);
-const activeAccount = ref<string | null>(null);
+const configs = ref<SmtpConfig[]>([]);
+const activeId = ref<string | null>(null);
 const emails = ref<InboxEmail[]>([]);
 const total = ref(0);
 const page = ref(1);
 const loading = ref(false);
+const syncing = ref(false);
 const detailEmail = ref<InboxEmail | null>(null);
 const showDetail = ref(false);
 
-const selectedAccount = computed(() => accounts.value.find(a => a.id === activeAccount.value));
+const activeConfig = computed(() => configs.value.find(c => c.id === activeId.value));
 
 onMounted(async () => {
-  const { data } = await fetchInboxAccounts();
-  if (!data) return;
-  accounts.value = data.accounts;
-  if (accounts.value.length > 0) {
-    activeAccount.value = accounts.value[0].id;
+  const { data, error } = await fetchInboxConfigs();
+  if (error) return;
+  configs.value = data.configs;
+  if (configs.value.length > 0) {
+    activeId.value = configs.value[0].id;
     await loadEmails();
   }
 });
 
 async function loadEmails() {
-  if (!activeAccount.value) return;
+  if (!activeId.value) return;
   loading.value = true;
-  const { data, error } = await fetchInboxEmails(activeAccount.value, page.value);
+  const { data, error } = await fetchInboxEmails(activeId.value, page.value);
   if (!error && data) {
     emails.value = data.emails;
     total.value = data.total;
@@ -39,9 +41,22 @@ async function loadEmails() {
   loading.value = false;
 }
 
-async function switchAccount(id: string) {
-  activeAccount.value = id;
+async function switchConfig(id: string) {
+  activeId.value = id;
   page.value = 1;
+  await loadEmails();
+}
+
+async function handleSync() {
+  if (!activeId.value) return;
+  syncing.value = true;
+  const { data, error } = await syncInbox(activeId.value);
+  if (!error) {
+    message.success(`同步完成，新增 ${data.synced} 封`);
+  } else {
+    message.error('同步失败，请检查 IMAP 配置和授权码');
+  }
+  syncing.value = false;
   await loadEmails();
 }
 
@@ -50,7 +65,6 @@ async function openDetail(id: string) {
   if (!error && data) {
     detailEmail.value = data.email;
     showDetail.value = true;
-    // 更新列表中的已读状态
     const email = emails.value.find(e => e.id === id);
     if (email) email.isRead = true;
   }
@@ -80,36 +94,41 @@ function stripHtml(html: string) {
   <NSpace vertical :size="16">
     <div class="flex-y-center justify-between">
       <h2 class="text-24px font-600">收件箱</h2>
-      <NButton quaternary @click="router.push('/inbox-account')">管理账户</NButton>
+      <NSpace>
+        <NButton quaternary @click="router.push('/smtp')">配置 IMAP</NButton>
+        <NButton v-if="activeId" type="primary" :loading="syncing" @click="handleSync">
+          {{ syncing ? '同步中' : '同步新邮件' }}
+        </NButton>
+      </NSpace>
     </div>
 
-    <!-- 账户选择 -->
-    <NSpace v-if="accounts.length > 0">
-      <NTag v-for="acc in accounts" :key="acc.id" :bordered="false"
-        :type="activeAccount === acc.id ? 'primary' : 'default'"
-        style="cursor: pointer;" @click="switchAccount(acc.id)">
-        {{ acc.name }}
+    <NAlert type="info" :bordered="false">
+      在【发件配置】中为邮箱配置 IMAP 收件服务器后，即可在此统一查看邮件。QQ邮箱需开启 IMAP 服务并获取授权码。
+    </NAlert>
+
+    <!-- 配置选择 -->
+    <NSpace v-if="configs.length > 0">
+      <NTag v-for="cfg in configs" :key="cfg.id" :bordered="false"
+        :type="activeId === cfg.id ? 'primary' : 'default'" style="cursor: pointer;" @click="switchConfig(cfg.id)">
+        {{ cfg.name }}
       </NTag>
     </NSpace>
-    <NEmpty v-else description="暂无收件账户，请先添加" />
 
     <!-- 邮件列表 -->
-    <NCard :bordered="false" class="card-wrapper" v-if="activeAccount">
+    <NCard :bordered="false" class="card-wrapper" v-if="activeId">
       <template #header>
         <div class="flex-y-center justify-between">
-          <span>{{ selectedAccount?.name || '' }} - 收件箱</span>
+          <span>{{ activeConfig?.name || '' }} - 收件箱</span>
           <span class="text-14px text-#999">共 {{ total }} 封</span>
         </div>
       </template>
 
       <NSpin :show="loading">
         <div v-if="emails.length === 0 && !loading" class="py-40px text-center text-#999">
-          暂无邮件，请点击"同步"按钮拉取
+          暂无邮件，点击"同步新邮件"拉取
         </div>
 
-        <div v-for="email in emails" :key="email.id"
-          class="email-item" :class="{ 'email-unread': !email.isRead }"
-          @click="openDetail(email.id)">
+        <div v-for="email in emails" :key="email.id" class="email-item" :class="{ 'email-unread': !email.isRead }" @click="openDetail(email.id)">
           <div class="flex-y-center justify-between">
             <div class="flex-y-center gap-8px">
               <span v-if="!email.isRead" class="w-8px h-8px rounded-full bg-#2080f0 inline-block" />
@@ -122,6 +141,8 @@ function stripHtml(html: string) {
         </div>
       </NSpin>
     </NCard>
+
+    <NEmpty v-if="configs.length === 0" description="暂无配置 IMAP 的发件配置，请先到发件配置中设置" />
 
     <!-- 邮件详情弹窗 -->
     <NModal v-model:show="showDetail" preset="card" style="width: 700px; max-height: 80vh; overflow-y: auto;" :title="detailEmail?.subject || '邮件详情'">
@@ -153,28 +174,11 @@ function stripHtml(html: string) {
   cursor: pointer;
   transition: background 0.2s;
 }
-.email-item:hover {
-  background: #f5f7fa;
-}
-.email-item.email-unread {
-  background: #f0f7ff;
-}
-html.dark .email-item {
-  border-color: #333;
-}
-html.dark .email-item:hover {
-  background: #2a2a2a;
-}
-html.dark .email-item.email-unread {
-  background: #1a2a3a;
-}
-.email-content {
-  padding: 16px;
-  border: 1px solid #efefef;
-  border-radius: 4px;
-  min-height: 100px;
-}
-html.dark .email-content {
-  border-color: #333;
-}
+.email-item:hover { background: #f5f7fa; }
+.email-item.email-unread { background: #f0f7ff; }
+html.dark .email-item { border-color: #333; }
+html.dark .email-item:hover { background: #2a2a2a; }
+html.dark .email-item.email-unread { background: #1a2a3a; }
+.email-content { padding: 16px; border: 1px solid #efefef; border-radius: 4px; min-height: 100px; }
+html.dark .email-content { border-color: #333; }
 </style>

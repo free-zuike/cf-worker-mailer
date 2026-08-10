@@ -111,6 +111,16 @@ export async function initDatabase(env: Env) {
           )
         `).run();
       }
+      // 迁移：为 smtp_configs 添加 IMAP 字段
+      try {
+        await env.DB.prepare("ALTER TABLE smtp_configs ADD COLUMN imap_host TEXT").run();
+      } catch {}
+      try {
+        await env.DB.prepare("ALTER TABLE smtp_configs ADD COLUMN imap_port INTEGER").run();
+      } catch {}
+      try {
+        await env.DB.prepare("ALTER TABLE smtp_configs ADD COLUMN imap_use_tls INTEGER DEFAULT 1").run();
+      } catch {}
       return;
     }
 
@@ -139,6 +149,7 @@ export async function initDatabase(env: Env) {
         host TEXT, port INTEGER, username TEXT, password TEXT,
         from_email TEXT NOT NULL, from_name TEXT,
         secure INTEGER DEFAULT 1, enabled INTEGER DEFAULT 1,
+        imap_host TEXT, imap_port INTEGER, imap_use_tls INTEGER DEFAULT 1,
         created_at TEXT NOT NULL, updated_at TEXT NOT NULL
       )
     `).run();

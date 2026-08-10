@@ -25,7 +25,6 @@ export const views: Record<LastLevelRouteKey, RouteComponent | (() => Promise<Ro
   "global-variables": () => import("@/views/global-variables/index.vue"),
   history: () => import("@/views/history/index.vue"),
   home: () => import("@/views/home/index.vue"),
-  "inbox-account": () => import("@/views/inbox-account/index.vue"),
   inbox: () => import("@/views/inbox/index.vue"),
   "oauth-callback": () => import("@/views/oauth-callback/index.vue"),
   settings: () => import("@/views/settings/index.vue"),

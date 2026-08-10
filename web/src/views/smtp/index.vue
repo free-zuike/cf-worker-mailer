@@ -26,7 +26,10 @@ const form = reactive<CreateSmtpConfigParams>({
   password: '',
   fromEmail: '',
   fromName: '',
-  secure: false
+  secure: false,
+  imapHost: '',
+  imapPort: 993,
+  imapUseTls: true
 });
 
 const isEdit = computed(() => Boolean(editingId.value));
@@ -36,6 +39,12 @@ const columns = computed(() => [
   { title: '主机', key: 'host', width: 180 },
   { title: '端口', key: 'port', width: 80 },
   { title: '发件邮箱', key: 'fromEmail', width: 200 },
+  {
+    title: '收件',
+    key: 'imapHost',
+    width: 70,
+    render: (row: SmtpConfig) => (row.imapHost ? '✅' : '')
+  },
   {
     title: '状态',
     key: 'enabled',
@@ -78,7 +87,10 @@ function openCreate() {
     password: '',
     fromEmail: '',
     fromName: '',
-    secure: false
+    secure: false,
+    imapHost: '',
+    imapPort: 993,
+    imapUseTls: true
   });
   showModal.value = true;
 }
@@ -94,7 +106,10 @@ function openEdit(config: SmtpConfig) {
     password: '',
     fromEmail: config.fromEmail,
     fromName: config.fromName,
-    secure: config.secure
+    secure: config.secure,
+    imapHost: config.imapHost || '',
+    imapPort: config.imapPort || 993,
+    imapUseTls: config.imapUseTls !== false
   });
   showModal.value = true;
 }
@@ -172,6 +187,20 @@ onMounted(loadConfigs);
           <NButton type="primary" @click="handleSave">保存</NButton>
           <NButton @click="showModal = false">取消</NButton>
         </NSpace>
+      </NForm>
+
+      <NDivider />
+      <h4 class="mb-12px">收件设置（IMAP，可选）</h4>
+      <NForm label-placement="left" label-width="90">
+        <NFormItem label="IMAP 主机">
+          <NInput v-model:value="form.imapHost" placeholder="imap.qq.com（留空则不支持收件）" />
+        </NFormItem>
+        <NFormItem label="IMAP 端口">
+          <NInputNumber v-model:value="form.imapPort" :min="1" :max="65535" style="width: 100%" />
+        </NFormItem>
+        <NFormItem label="SSL">
+          <NSwitch v-model:value="form.imapUseTls" />
+        </NFormItem>
       </NForm>
     </NModal>
   </NSpace>
