@@ -103,7 +103,7 @@ npm run dev
    |--------|------|
    | `CLOUDFLARE_API_TOKEN` | Cloudflare API Token（权限：Workers、D1、R2、Queues） |
    | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare 账户 ID（在 Workers 页面右下角可找到） |
-   | `ENCRYPTION_KEY` | 加密密钥（任意 32 位以上随机字符串，务必保留！） |
+   | `ENCRYPTION_KEY` | **加密密钥（必填！）** 生成方法：`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
 
 3. 推送到 `main` 分支，GitHub Actions 会自动：
    - 创建 D1 数据库、R2 存储桶、队列

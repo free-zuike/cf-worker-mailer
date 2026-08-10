@@ -35,20 +35,12 @@ fi
 echo "=== 5. 设置 ENCRYPTION_KEY ==="
 if [ -n "$ENCRYPTION_KEY" ]; then
   echo "$ENCRYPTION_KEY" | npx wrangler secret put ENCRYPTION_KEY 2>/dev/null || echo "ENCRYPTION_KEY 已设置或跳过"
-  echo "ENCRYPTION_KEY 已使用你提供的值"
+  echo "ENCRYPTION_KEY 已设置"
 else
-  # 自动生成随机密钥
-  AUTO_KEY=$(openssl rand -hex 32)
-  echo "$AUTO_KEY" | npx wrangler secret put ENCRYPTION_KEY 2>/dev/null || echo "设置 ENCRYPTION_KEY 失败"
-  echo ""
-  echo "=============================================="
-  echo "⚠️  已自动生成并设置 ENCRYPTION_KEY"
-  echo "   请务必保存下面这个密钥，丢失后无法解密已保存的密码："
-  echo ""
-  echo "    ENCRYPTION_KEY = $AUTO_KEY"
-  echo ""
-  echo "   建议复制到密码管理器或本地文件中保存"
-  echo "=============================================="
+  echo "错误: ENCRYPTION_KEY 未设置。"
+  echo "请在 GitHub Secrets 中添加 ENCRYPTION_KEY（任意 32 位以上随机字符串）"
+  echo "生成方法: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\""
+  exit 1
 fi
 
 echo ""
