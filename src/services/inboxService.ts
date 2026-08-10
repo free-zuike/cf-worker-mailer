@@ -34,6 +34,7 @@ export class InboxService {
       host: full.config.imapHost,
       port: full.config.imapPort || 993,
       tls: full.config.imapUseTls !== false,
+      timeoutMs: 30000,
       auth: { username: full.config.username, password }
     });
 
