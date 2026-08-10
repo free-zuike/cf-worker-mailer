@@ -96,7 +96,7 @@ export class InboxService {
       try {
         return await this.doSync(configId, full, password);
       } catch (e) {
-        console.error(`Sync attempt ${attempt + 1} failed:`, e);
+        console.error(`Sync attempt ${attempt + 1} failed:`, (e as Error).message);
         if (attempt === 1) throw e;
         await new Promise(r => setTimeout(r, 2000));
       }

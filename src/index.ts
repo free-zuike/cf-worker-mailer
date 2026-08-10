@@ -93,6 +93,13 @@ export default {
   async queue(batch: MessageBatch<QueueMessage>, env: Env, ctx: ExecutionContext): Promise<void> {
     console.log(`Processing ${batch.messages.length} messages from queue`);
 
+    // 确保数据库表存在
+    try {
+      await initDatabase(env);
+    } catch (e) {
+      console.error('Queue init database failed:', e);
+    }
+
     for (const message of batch.messages) {
       try {
         const msg = message.body;
@@ -106,7 +113,7 @@ export default {
         }
         message.ack();
       } catch (error) {
-        console.error('Failed to process queue message:', error);
+        console.error('Failed to process queue message:', (error as Error).message);
         message.retry();
       }
     }
