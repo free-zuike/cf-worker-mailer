@@ -5,10 +5,12 @@ import api from './routes/api';
 import { EmailService } from './services/emailService';
 import { initDatabase } from './db/init';
 
-/** 邮件发送队列消息体 */
-interface QueueEmailMessage {
-  emailId: string;
-  userId: string;
+/** 队列消息体（邮件发送 + 收件箱同步） */
+interface QueueMessage {
+  type: 'email' | 'inbox-sync';
+  emailId?: string;
+  userId?: string;
+  configId?: string;
 }
 
 const app = new Hono<{ Bindings: Env }>();
@@ -84,14 +86,20 @@ export default {
     return app.fetch(request, env, ctx);
   },
 
-  async queue(batch: MessageBatch<QueueEmailMessage>, env: Env, ctx: ExecutionContext): Promise<void> {
+  async queue(batch: MessageBatch<QueueMessage>, env: Env, ctx: ExecutionContext): Promise<void> {
     console.log(`Processing ${batch.messages.length} messages from queue`);
 
     for (const message of batch.messages) {
       try {
-        const { emailId, userId } = message.body;
-        const emailService = new EmailService(env, userId);
-        await emailService.processEmail(emailId);
+        const msg = message.body;
+        if (msg.type === 'email' && msg.emailId && msg.userId) {
+          const emailService = new EmailService(env, msg.userId);
+          await emailService.processEmail(msg.emailId);
+        } else if (msg.type === 'inbox-sync' && msg.configId && msg.userId) {
+          const { InboxService } = await import('./services/inboxService');
+          const svc = new InboxService(env, msg.userId);
+          await svc.syncByConfigId(msg.configId);
+        }
         message.ack();
       } catch (error) {
         console.error('Failed to process queue message:', error);

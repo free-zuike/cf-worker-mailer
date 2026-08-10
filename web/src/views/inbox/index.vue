@@ -50,14 +50,19 @@ async function switchConfig(id: string) {
 async function handleSync() {
   if (!activeId.value) return;
   syncing.value = true;
-  const { data, error } = await syncInbox(activeId.value);
+  const { error } = await syncInbox(activeId.value);
   if (!error) {
-    message.success(`同步完成，新增 ${data.synced} 封`);
+    message.success('同步任务已提交，正在后台处理...');
+    // 队列处理需要时间，延迟后刷新
+    setTimeout(async () => {
+      await loadEmails();
+      syncing.value = false;
+      message.success('同步完成');
+    }, 5000);
   } else {
-    message.error('同步失败，请检查 IMAP 配置和授权码');
+    message.error('同步提交失败');
+    syncing.value = false;
   }
-  syncing.value = false;
-  await loadEmails();
 }
 
 async function openDetail(id: string) {

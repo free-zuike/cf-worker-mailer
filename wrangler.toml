@@ -40,6 +40,13 @@ bucket_name = "worker-mailer-uploads"
 # ADMIN_EMAIL = "admin@example.com"
 
 # ------------------------------------------
+# 队列（异步处理）
+# ------------------------------------------
+[[queues]]
+binding = "MAIL_QUEUE"
+queue_name = "cf-worker-mailer-queue"
+
+# ------------------------------------------
 # Workers 日志和监控
 # ------------------------------------------
 [observability]
