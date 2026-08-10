@@ -42,9 +42,15 @@ bucket_name = "worker-mailer-uploads"
 # ------------------------------------------
 # 队列（异步处理）
 # ------------------------------------------
-[queues]
+[[queues.producers]]
 binding = "MAIL_QUEUE"
 queue = "mailer-queue"
+
+[[queues.consumers]]
+queue = "mailer-queue"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 3
 
 # ------------------------------------------
 # Workers 日志和监控
