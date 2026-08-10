@@ -149,19 +149,17 @@ mcp.post('/', async (c) => {
           }
 
           case 'list_inbox': {
-            const inboxService = new InboxService(c.env, user.id);
-            const configId = String(args.configId || '');
-            const folder = String(args.folder || 'INBOX');
-            const page = Number(args.page || 1);
-            const result = await inboxService.listEmails(configId, folder, page, 20);
+            if (!args.configId) return respondError(400, '缺少 configId，请先调用 list_inbox_configs 获取配置 ID');
+            const svc = new InboxService(c.env, user.id);
+            const result = await svc.listEmails(String(args.configId), String(args.folder || 'INBOX'), Number(args.page || 1), 20);
             return respond(result);
           }
 
           case 'search_emails': {
-            const inboxService = new InboxService(c.env, user.id);
-            const configId = String(args.configId || '');
-            const q = String(args.q || '');
-            const result = await inboxService.searchEmails(configId, q);
+            if (!args.configId) return respondError(400, '缺少 configId');
+            if (!args.q) return respondError(400, '缺少搜索关键词 q');
+            const svc = new InboxService(c.env, user.id);
+            const result = await svc.searchEmails(String(args.configId), String(args.q));
             return respond(result);
           }
 
