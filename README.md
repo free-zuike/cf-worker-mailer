@@ -263,7 +263,45 @@ npm run deploy
 - `GET /api/metrics` - 获取统计数据
 - `POST /api/api-key/generate` - 生成 API Key
 
-## 变量替换语法
+## MCP Server（AI 模型调用）
+
+本服务实现了 **MCP (Model Context Protocol)** 协议，AI 模型（如 Claude、Cursor 等）可以通过 MCP 调用邮件服务。
+
+### 可用工具
+
+| 工具名 | 说明 |
+|--------|------|
+| `send_email` | 发送邮件 |
+| `list_inbox` | 查看收件箱 |
+| `search_emails` | 搜索邮件 |
+| `get_email` | 获取邮件详情 |
+| `list_smtp_configs` | 获取发件配置 |
+| `list_templates` | 获取邮件模板 |
+| `list_inbox_configs` | 获取支持 IMAP 的配置 |
+
+### 使用方式
+
+1. 先生成 API Key：
+```bash
+curl -X POST https://zuike.cc.cd/api/api-key/generate \
+  -H "Authorization: Bearer <你的登录token>"
+```
+
+2. 配置 MCP 客户端（如 Claude Desktop）：
+```json
+{
+  "mcpServers": {
+    "cf-worker-mailer": {
+      "url": "https://zuike.cc.cd/mcp",
+      "headers": {
+        "Authorization": "Bearer <你的API Key>"
+      }
+    }
+  }
+}
+```
+
+### 变量替换语法
 
 | 写法 | 效果 |
 |------|------|
