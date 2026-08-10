@@ -53,6 +53,7 @@ export interface CreateSmtpConfigRequest {
   imapHost?: string;
   imapPort?: number;
   imapUseTls?: boolean;
+  imapPassword?: string;
 }
 
 export interface UpdateSmtpConfigRequest {
@@ -69,6 +70,7 @@ export interface UpdateSmtpConfigRequest {
   imapHost?: string;
   imapPort?: number;
   imapUseTls?: boolean;
+  imapPassword?: string;
 }
 
 // ==================== 邮件模板相关类型 ====================

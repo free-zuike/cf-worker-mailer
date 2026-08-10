@@ -29,7 +29,7 @@ export class InboxService {
       host: full.config.imapHost,
       port: full.config.imapPort || 993,
       tls: full.config.imapUseTls !== false,
-      auth: { username: full.config.username, password: full.password }
+      auth: { username: full.config.username, password: full.imapPassword || full.password }
     });
 
     await imap.connect();

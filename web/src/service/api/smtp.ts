@@ -33,6 +33,7 @@ export interface CreateSmtpConfigParams {
   imapHost?: string;
   imapPort?: number;
   imapUseTls?: boolean;
+  imapPassword?: string;
 }
 
 export interface UpdateSmtpConfigParams {
@@ -49,6 +50,7 @@ export interface UpdateSmtpConfigParams {
   imapHost?: string;
   imapPort?: number;
   imapUseTls?: boolean;
+  imapPassword?: string;
 }
 
 /** 获取 SMTP 配置列表 */

@@ -231,7 +231,7 @@ const local: App.I18n.Schema = {
     'iframe-page': 'Iframe',
     home: 'Home',
     compose: 'Compose',
-    smtp: 'SMTP Configs',
+    smtp: 'Mail Configs',
     templates: 'Templates',
     'template-edit': 'Template Editor',
     history: 'Email History',

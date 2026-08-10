@@ -121,6 +121,9 @@ export async function initDatabase(env: Env) {
       try {
         await env.DB.prepare("ALTER TABLE smtp_configs ADD COLUMN imap_use_tls INTEGER DEFAULT 1").run();
       } catch {}
+      try {
+        await env.DB.prepare("ALTER TABLE smtp_configs ADD COLUMN imap_password TEXT").run();
+      } catch {}
       return;
     }
 
@@ -149,7 +152,7 @@ export async function initDatabase(env: Env) {
         host TEXT, port INTEGER, username TEXT, password TEXT,
         from_email TEXT NOT NULL, from_name TEXT,
         secure INTEGER DEFAULT 1, enabled INTEGER DEFAULT 1,
-        imap_host TEXT, imap_port INTEGER, imap_use_tls INTEGER DEFAULT 1,
+        imap_host TEXT, imap_port INTEGER, imap_use_tls INTEGER DEFAULT 1, imap_password TEXT,
         created_at TEXT NOT NULL, updated_at TEXT NOT NULL
       )
     `).run();

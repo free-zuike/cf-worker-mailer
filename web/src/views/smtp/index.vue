@@ -29,7 +29,8 @@ const form = reactive<CreateSmtpConfigParams>({
   secure: false,
   imapHost: '',
   imapPort: 993,
-  imapUseTls: true
+  imapUseTls: true,
+  imapPassword: ''
 });
 
 const isEdit = computed(() => Boolean(editingId.value));
@@ -90,7 +91,8 @@ function openCreate() {
     secure: false,
     imapHost: '',
     imapPort: 993,
-    imapUseTls: true
+    imapUseTls: true,
+    imapPassword: ''
   });
   showModal.value = true;
 }
@@ -109,7 +111,8 @@ function openEdit(config: SmtpConfig) {
     secure: config.secure,
     imapHost: config.imapHost || '',
     imapPort: config.imapPort || 993,
-    imapUseTls: config.imapUseTls !== false
+    imapUseTls: config.imapUseTls !== false,
+    imapPassword: ''
   });
   showModal.value = true;
 }
@@ -148,7 +151,7 @@ onMounted(loadConfigs);
 <template>
   <NSpace vertical :size="16">
     <div class="flex-y-center justify-between">
-      <h2 class="text-24px font-600">SMTP 配置</h2>
+      <h2 class="text-24px font-600">发件配置</h2>
       <NButton type="primary" @click="openCreate">新增配置</NButton>
     </div>
 
@@ -193,13 +196,16 @@ onMounted(loadConfigs);
       <h4 class="mb-12px">收件设置（IMAP，可选）</h4>
       <NForm label-placement="left" label-width="90">
         <NFormItem label="IMAP 主机">
-          <NInput v-model:value="form.imapHost" placeholder="imap.qq.com（留空则不支持收件）" />
+          <NInput v-model:value="form.imapHost" placeholder="imap.example.com（留空则不支持收件）" />
         </NFormItem>
         <NFormItem label="IMAP 端口">
           <NInputNumber v-model:value="form.imapPort" :min="1" :max="65535" style="width: 100%" />
         </NFormItem>
         <NFormItem label="SSL">
           <NSwitch v-model:value="form.imapUseTls" />
+        </NFormItem>
+        <NFormItem label="授权码">
+          <NInput v-model:value="form.imapPassword" type="password" placeholder="留空则使用 SMTP 的授权码" />
         </NFormItem>
       </NForm>
     </NModal>

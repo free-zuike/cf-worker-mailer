@@ -227,7 +227,7 @@ const local: App.I18n.Schema = {
     'iframe-page': '外链页面',
     home: '首页',
     compose: '发送邮件',
-    smtp: 'SMTP 配置',
+    smtp: '发件配置',
     templates: '邮件模板',
     'template-edit': '模板编辑',
     history: '发送历史',

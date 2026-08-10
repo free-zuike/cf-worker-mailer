@@ -22,9 +22,10 @@ export class SmtpService {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
     const encryptedPassword = config.password ? await encrypt(config.password, this.getEncryptionKey()) : '';
+    const encryptedImapPassword = config.imapPassword ? await encrypt(config.imapPassword, this.getEncryptionKey()) : null;
 
     await this.env.DB.prepare(
-      'INSERT INTO smtp_configs (id, user_id, name, type, host, port, username, password, from_email, from_name, secure, enabled, imap_host, imap_port, imap_use_tls, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO smtp_configs (id, user_id, name, type, host, port, username, password, from_email, from_name, secure, enabled, imap_host, imap_port, imap_use_tls, imap_password, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     )
       .bind(
         id,
@@ -42,6 +43,7 @@ export class SmtpService {
         config.imapHost || null,
         config.imapPort || null,
         config.imapUseTls !== false ? 1 : 0,
+        encryptedImapPassword,
         now,
         now
       )
@@ -106,6 +108,10 @@ export class SmtpService {
     if (updates.imapUseTls !== undefined) {
       fields.push('imap_use_tls = ?');
       values.push(updates.imapUseTls ? 1 : 0);
+    }
+    if (updates.imapPassword !== undefined) {
+      fields.push('imap_password = ?');
+      values.push(updates.imapPassword ? await encrypt(updates.imapPassword, this.getEncryptionKey()) : null);
     }
     fields.push('updated_at = ?');
     values.push(now);
@@ -250,9 +256,9 @@ export class SmtpService {
     };
   }
 
-  async getFullConfig(id: string): Promise<{ config: SmtpConfig; password: string } | null> {
+  async getFullConfig(id: string): Promise<{ config: SmtpConfig; password: string; imapPassword?: string } | null> {
     const row = await this.env.DB.prepare(
-      'SELECT id, user_id, name, type, host, port, username, password, from_email, from_name, secure, enabled, imap_host, imap_port, imap_use_tls, created_at, updated_at FROM smtp_configs WHERE id = ? AND user_id = ?'
+      'SELECT id, user_id, name, type, host, port, username, password, from_email, from_name, secure, enabled, imap_host, imap_port, imap_use_tls, imap_password, created_at, updated_at FROM smtp_configs WHERE id = ? AND user_id = ?'
     ).bind(id, this.userId).first<{
       id: string;
       user_id: string;
@@ -269,6 +275,7 @@ export class SmtpService {
       imap_host?: string;
       imap_port?: number;
       imap_use_tls?: number;
+      imap_password?: string;
       created_at: string;
       updated_at: string;
     }>();
@@ -276,6 +283,7 @@ export class SmtpService {
     if (!row) return null;
 
     const password = row.password ? await decrypt(row.password, this.getEncryptionKey()) : '';
+    const imapPassword = row.imap_password ? await decrypt(row.imap_password, this.getEncryptionKey()) : undefined;
 
     return {
       config: {
@@ -296,7 +304,8 @@ export class SmtpService {
         createdAt: row.created_at,
         updatedAt: row.updated_at
       },
-      password
+      password,
+      imapPassword
     };
   }
 }
