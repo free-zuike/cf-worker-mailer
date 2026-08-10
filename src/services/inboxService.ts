@@ -53,16 +53,21 @@ export class InboxService {
     const batchSize = 50;
     for (let start = 1; start <= totalMessages; start += batchSize) {
       const end = Math.min(start + batchSize - 1, totalMessages);
-      const emails = await imap.fetchEmails({ limit: [start, end], fetchBody: true });
-      for (const email of emails) {
-        if (syncedUids.has(email.uid)) continue;
-        try {
-          await this.storeEmail(configId, email);
-          synced++;
-        } catch (e) {
-          console.error('Failed to store email:', e);
-          errors++;
+      try {
+        const emails = await imap.fetchEmails({ limit: [start, end], fetchBody: true, peek: true });
+        for (const email of emails) {
+          if (syncedUids.has(email.uid)) continue;
+          try {
+            await this.storeEmail(configId, email);
+            synced++;
+          } catch (e) {
+            console.error('Failed to store email:', e);
+            errors++;
+          }
         }
+      } catch (e) {
+        console.error('Failed to fetch batch', start, '-', end, ':', e);
+        errors++;
       }
     }
 
