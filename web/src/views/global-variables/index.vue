@@ -104,7 +104,7 @@ onMounted(loadVariables);
     </div>
 
     <NAlert type="info" :bordered="false">
-      <span v-pre>在模板中使用 {{变量名}} 引用全局变量，发送邮件时会自动替换为对应值。</span>
+      <span v-pre>在模板中使用 {{变量名}} 引用全局变量，发送邮件时会自动替换为对应值。用 {{{{变量名}}}} 可保留原文不替换。</span>
     </NAlert>
 
     <NDataTable

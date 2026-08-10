@@ -139,7 +139,10 @@ export class TemplateService {
     }));
   }
 
-  /** 将变量渲染进模板内容。使用 `\{{变量名}}` 可保留原文不替换 */
+  /** 将变量渲染进模板内容。
+   *  - `{{变量名}}` 会被替换为变量值
+   *  - `{{{{变量名}}}}`（双括号）保留为 `{{变量名}}` 不替换
+   */
   applyVariables(
     content: string,
     variables: Record<string, string>,
@@ -158,6 +161,8 @@ export class TemplateService {
 
     // 第一步：处理转义——把不替换的变量标记为占位符
     let result = content
+      // 双括号逃逸：{{{{name}}}} → 保留为 {{name}} 不替换
+      .replace(/{{{{([^}]+)}}}}/g, (_, name) => ESC_OPEN + name + ESC_CLOSE)
       // 全角括号 ｛｛name｝｝ → 用不同占位符标记左右括号
       .replace(/｛｛/g, ESC_OPEN)
       .replace(/｝｝/g, ESC_CLOSE)

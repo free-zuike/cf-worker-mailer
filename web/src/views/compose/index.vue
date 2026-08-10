@@ -255,7 +255,7 @@ function toggleContact(c: Contact, checked: boolean) {
         </NFormItem>
         <NFormItem label="">
           <NCheckbox v-model:checked="form.skipVariableReplace">
-            <span v-pre>不替换变量（保留 {{name}} 原样）</span>
+            <span v-pre>不替换变量（保留 {{name}} 原样）。用 {{{{name}}}} 可单个变量不替换</span>
           </NCheckbox>
         </NFormItem>
       </NForm>
