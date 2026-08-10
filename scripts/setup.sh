@@ -35,8 +35,20 @@ fi
 echo "=== 5. 设置 ENCRYPTION_KEY ==="
 if [ -n "$ENCRYPTION_KEY" ]; then
   echo "$ENCRYPTION_KEY" | npx wrangler secret put ENCRYPTION_KEY 2>/dev/null || echo "ENCRYPTION_KEY 已设置或跳过"
+  echo "ENCRYPTION_KEY 已使用你提供的值"
 else
-  echo "ENCRYPTION_KEY 未设置，跳过（部署后需手动设置）"
+  # 自动生成随机密钥
+  AUTO_KEY=$(openssl rand -hex 32)
+  echo "$AUTO_KEY" | npx wrangler secret put ENCRYPTION_KEY 2>/dev/null || echo "设置 ENCRYPTION_KEY 失败"
+  echo ""
+  echo "=============================================="
+  echo "⚠️  已自动生成并设置 ENCRYPTION_KEY"
+  echo "   请务必保存下面这个密钥，丢失后无法解密已保存的密码："
+  echo ""
+  echo "    ENCRYPTION_KEY = $AUTO_KEY"
+  echo ""
+  echo "   建议复制到密码管理器或本地文件中保存"
+  echo "=============================================="
 fi
 
 echo ""
