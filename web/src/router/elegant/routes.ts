@@ -46,7 +46,9 @@ export const generatedRoutes: GeneratedRoute[] = [
     meta: {
       title: 'api-keys',
       i18nKey: 'route.api-keys',
-      hideInMenu: true
+      hideInMenu: true,
+      order: 10,
+      icon: 'mdi:key-variant'
     }
   },
   {

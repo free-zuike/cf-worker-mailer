@@ -26,7 +26,7 @@ export function setupElegantRouter() {
 
       const constantRoutes: RouteKey[] = ['login', '403', '404', '500'];
 
-      const hideInMenuRoutes: RouteKey[] = ['login', '403', '404', '500', 'template-edit', 'oauth-callback', 'iframe-page', 'api-keys'];
+      const hideInMenuRoutes: RouteKey[] = ['login', '403', '404', '500', 'template-edit', 'oauth-callback', 'iframe-page'];
 
       const menuConfig: Record<string, { order: number; icon: string }> = {
         home: { order: 1, icon: 'mdi:monitor-dashboard' },
@@ -37,7 +37,8 @@ export function setupElegantRouter() {
         history: { order: 6, icon: 'mdi:history' },
         settings: { order: 7, icon: 'mdi:cog-outline' },
         'global-variables': { order: 8, icon: 'mdi:variable' },
-        contacts: { order: 9, icon: 'mdi:book-account-outline' }
+        contacts: { order: 9, icon: 'mdi:book-account-outline' },
+        'api-keys': { order: 10, icon: 'mdi:key-variant' }
       };
 
       const meta: Partial<RouteMeta> = {
