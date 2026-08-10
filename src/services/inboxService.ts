@@ -26,15 +26,6 @@ export class InboxService {
     if (!full.config.imapHost) throw new Error('该配置未设置 IMAP 收件服务器');
 
     const password = full.imapPassword || full.password;
-    console.log('[inbox] sync config:', JSON.stringify({
-      configName: full.config.name,
-      username: full.config.username,
-      usernameLen: full.config.username?.length || 0,
-      passwordLen: password?.length || 0,
-      imapHost: full.config.imapHost,
-      imapPort: full.config.imapPort,
-      hasImapPassword: !!full.imapPassword
-    }));
     if (!full.config.username || !password) {
       throw new Error('IMAP 用户名或密码为空，请在发件配置中检查 SMTP 密码和 IMAP 授权码');
     }

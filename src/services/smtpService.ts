@@ -77,7 +77,7 @@ export class SmtpService {
       fields.push('username = ?');
       values.push(updates.username);
     }
-    if (updates.password !== undefined) {
+    if (updates.password !== undefined && updates.password !== '') {
       fields.push('password = ?');
       values.push(await encrypt(updates.password, this.getEncryptionKey()));
     }
