@@ -22,18 +22,18 @@ async function getUserByApiKey(env: Env, apiKey: string): Promise<{ id: string }
 const TOOLS = [
   {
     name: 'send_email',
-    description: '发送邮件。需要 to(收件人)、subject(主题)、html 或 text(内容)。可选 configId(发件配置)。',
+    description: '发送邮件。发件人使用发件配置中的邮箱，无需额外指定。需要先通过 list_smtp_configs 获取发件配置 ID。',
     inputSchema: {
       type: 'object',
       properties: {
+        configId: { type: 'string', description: '发件配置 ID（通过 list_smtp_configs 获取）' },
         to: { type: 'string', description: '收件人邮箱，多个用逗号分隔' },
         subject: { type: 'string', description: '邮件主题' },
-        html: { type: 'string', description: 'HTML 内容' },
-        text: { type: 'string', description: '纯文本内容' },
-        configId: { type: 'string', description: '发件配置 ID（可选，不填则需指定）' },
-        cc: { type: 'string', description: '抄送，多个用逗号分隔' }
+        html: { type: 'string', description: 'HTML 内容（可选，与 text 二选一）' },
+        text: { type: 'string', description: '纯文本内容（可选，与 html 二选一）' },
+        cc: { type: 'string', description: '抄送，多个用逗号分隔（可选）' }
       },
-      required: ['to', 'subject']
+      required: ['configId', 'to', 'subject']
     }
   },
   {
@@ -136,12 +136,13 @@ mcp.post('/', async (c) => {
             const emailService = new EmailService(c.env, user.id);
             const toArr = String(args.to || '').split(',').map(s => s.trim()).filter(Boolean);
             if (!toArr.length) return respondError(400, '收件人不能为空');
+            if (!args.configId) return respondError(400, '缺少 configId，请先调用 list_smtp_configs 获取发件配置 ID');
             const result = await emailService.sendEmail({
               to: toArr,
               subject: String(args.subject || ''),
               html: args.html ? String(args.html) : undefined,
               text: args.text ? String(args.text) : undefined,
-              configId: args.configId ? String(args.configId) : undefined,
+              configId: String(args.configId),
               cc: args.cc ? String(args.cc).split(',').map((s: string) => s.trim()).filter(Boolean) : undefined
             });
             return respond({ success: true, id: result.id, status: result.status, message: '邮件已发送' });
