@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, reactive, ref, watch, shallowRef } from 'vue';
+import { useRoute } from 'vue-router';
 import { useMessage } from 'naive-ui';
 import { sendEmail, type SendEmailParams } from '@/service/api/email';
 import { fetchSmtpConfigs, type SmtpConfig } from '@/service/api/smtp';
@@ -11,6 +12,7 @@ import '@wangeditor/editor/dist/css/style.css';
 import { localStg } from '@/utils/storage';
 
 const message = useMessage();
+const route = useRoute();
 const loading = ref(false);
 const smtpConfigs = ref<SmtpConfig[]>([]);
 const templates = ref<EmailTemplate[]>([]);
@@ -103,6 +105,16 @@ onMounted(async () => {
   }
   if (!tmplRes.error) templates.value = tmplRes.data.templates;
   if (!contactRes.error) contacts.value = contactRes.data.contacts;
+
+  // 处理回复/转发参数
+  const q = route.query;
+  if (q.to) toInput.value = String(q.to);
+  if (q.subject) form.subject = String(q.subject);
+  if (q.replyBody) {
+    form.html = `<blockquote>${String(q.replyBody)}</blockquote>`;
+  } else if (q.forwardBody) {
+    form.html = `<blockquote>${String(q.forwardBody)}</blockquote>`;
+  }
 });
 
 // 选中模板时填充内容

@@ -31,17 +31,17 @@ export function fetchInboxConfigs() {
   return request<{ configs: SmtpConfig[] }>({ url: '/inbox/configs' });
 }
 
-// 同步某个配置的收件箱
+// 同步
 export function syncInbox(configId: string) {
   return request<{ synced: number; errors: number }>({ url: `/inbox/sync/${configId}`, method: 'post' });
 }
 
-// 获取文件夹列表
+// 文件夹列表
 export function fetchInboxFolders(configId: string) {
   return request<{ folders: InboxFolder[] }>({ url: `/inbox/folders/${configId}` });
 }
 
-// 列出邮件（支持文件夹筛选）
+// 邮件列表
 export function fetchInboxEmails(configId: string, folder = 'INBOX', page = 1, pageSize = 20) {
   return request<{ emails: InboxEmail[]; total: number }>({ url: `/inbox/emails/${configId}`, params: { folder, page, pageSize } });
 }
@@ -51,12 +51,27 @@ export function fetchInboxEmail(id: string) {
   return request<{ email: InboxEmail }>({ url: `/inbox/email/${id}` });
 }
 
-// 获取邮件完整内容（正文，按需拉取）
+// 获取正文（同时标记已读）
 export function fetchInboxEmailFull(id: string) {
   return request<{ email: InboxEmail }>({ url: `/inbox/email/${id}/full` });
 }
 
-// 删除邮件
+// 标记已读
+export function markInboxEmailRead(id: string) {
+  return request<{ success: boolean }>({ url: `/inbox/email/${id}/read`, method: 'post' });
+}
+
+// 标记未读
+export function markInboxEmailUnread(id: string) {
+  return request<{ success: boolean }>({ url: `/inbox/email/${id}/unread`, method: 'post' });
+}
+
+// 搜索
+export function searchInboxEmails(configId: string, q: string, page = 1, pageSize = 20) {
+  return request<{ emails: InboxEmail[]; total: number }>({ url: `/inbox/search/${configId}`, params: { q, page, pageSize } });
+}
+
+// 删除
 export function deleteInboxEmail(id: string) {
   return request<{ success: boolean }>({ url: `/inbox/email/${id}`, method: 'delete' });
 }

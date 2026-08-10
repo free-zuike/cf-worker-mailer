@@ -48,7 +48,7 @@ inbox.get('/emails/:configId', async (c) => {
   return c.json(result);
 });
 
-// 获取邮件详情（按需拉取完整内容）
+// 获取邮件详情（不改变已读状态）
 inbox.get('/email/:id', async (c) => {
   const svc = new InboxService(c.env, c.get('user').id);
   const email = await svc.getEmail(c.req.param('id'));
@@ -56,12 +56,55 @@ inbox.get('/email/:id', async (c) => {
   return c.json({ email });
 });
 
-// 获取邮件完整内容（正文，按需从 IMAP 拉取）
+// 获取邮件完整内容（正文，按需从 IMAP 拉取，并标记已读）
 inbox.get('/email/:id/full', async (c) => {
   const svc = new InboxService(c.env, c.get('user').id);
   const email = await svc.fetchEmailContent(c.req.param('id'));
   if (!email) return c.json({ error: '邮件不存在' }, 404);
   return c.json({ email });
+});
+
+// 标记已读
+inbox.post('/email/:id/read', async (c) => {
+  const svc = new InboxService(c.env, c.get('user').id);
+  await svc.markAsRead(c.req.param('id'));
+  return c.json({ success: true });
+});
+
+// 标记未读
+inbox.post('/email/:id/unread', async (c) => {
+  const svc = new InboxService(c.env, c.get('user').id);
+  await svc.markAsUnread(c.req.param('id'));
+  return c.json({ success: true });
+});
+
+// 搜索邮件（支持文件夹筛选）
+inbox.get('/search/:configId', async (c) => {
+  const svc = new InboxService(c.env, c.get('user').id);
+  const query = c.req.query('q') || '';
+  const page = parseInt(c.req.query('page') || '1');
+  const pageSize = parseInt(c.req.query('pageSize') || '20');
+  const result = await svc.searchEmails(c.req.param('configId'), query, page, pageSize);
+  return c.json(result);
+});
+
+// 下载附件
+inbox.get('/attachment/:emailId/:index', async (c) => {
+  const svc = new InboxService(c.env, c.get('user').id);
+  const email = await svc.getEmail(c.req.param('emailId'));
+  if (!email) return c.json({ error: '邮件不存在' }, 404);
+  let attachments: any[] = [];
+  try { attachments = JSON.parse(email.attachments || '[]'); } catch {}
+  const index = parseInt(c.req.param('index'));
+  const att = attachments[index];
+  if (!att || !att.contentBase64) return c.json({ error: '附件不存在' }, 404);
+  const bytes = Uint8Array.from(atob(att.contentBase64), c => c.charCodeAt(0));
+  return new Response(bytes, {
+    headers: {
+      'Content-Type': att.mimeType || 'application/octet-stream',
+      'Content-Disposition': `attachment; filename="${encodeURIComponent(att.filename || 'attachment')}"`
+    }
+  });
 });
 
 // 删除邮件

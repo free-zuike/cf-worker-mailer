@@ -2,7 +2,7 @@
 import { onMounted, onUnmounted, ref, computed } from 'vue';
 import { useMessage } from 'naive-ui';
 import { useRouter } from 'vue-router';
-import { fetchInboxConfigs, fetchInboxEmails, fetchInboxEmailFull, deleteInboxEmail, syncInbox, fetchInboxFolders, type InboxEmail, type InboxFolder } from '@/service/api/inbox';
+import { fetchInboxConfigs, fetchInboxEmails, fetchInboxEmailFull, deleteInboxEmail, syncInbox, fetchInboxFolders, markInboxEmailRead, markInboxEmailUnread, searchInboxEmails, type InboxEmail, type InboxFolder } from '@/service/api/inbox';
 import type { SmtpConfig } from '@/service/api/smtp';
 
 const message = useMessage();
@@ -19,11 +19,18 @@ const loading = ref(false);
 const syncing = ref(false);
 const detailEmail = ref<InboxEmail | null>(null);
 const showDetail = ref(false);
+const searchQuery = ref('');
+const isSearching = ref(false);
 
 const activeConfig = computed(() => configs.value.find(c => c.id === activeId.value));
 
 const folderTabs = computed(() => {
   return folders.value.map(f => ({ label: f.label, value: f.name }));
+});
+
+const attachments = computed(() => {
+  if (!detailEmail.value?.attachments) return [];
+  try { return JSON.parse(detailEmail.value.attachments); } catch { return []; }
 });
 
 onMounted(async () => {
@@ -34,12 +41,10 @@ onMounted(async () => {
     activeId.value = configs.value[0].id;
     await loadFolders();
     await loadEmails();
-    // 进入页面时自动同步一次
     autoSync();
   }
 });
 
-// 自动同步：每 2 分钟检查一次
 let syncTimer: ReturnType<typeof setInterval> | null = null;
 onMounted(() => {
   syncTimer = setInterval(() => autoSync(), 120_000);
@@ -48,12 +53,53 @@ onUnmounted(() => {
   if (syncTimer) clearInterval(syncTimer);
 });
 
+async function loadFolders() {
+  if (!activeId.value) return;
+  const { data, error } = await fetchInboxFolders(activeId.value);
+  if (!error && data) folders.value = data.folders;
+}
+
+async function loadEmails() {
+  if (!activeId.value) return;
+  loading.value = true;
+  const { data, error } = isSearching.value
+    ? await searchInboxEmails(activeId.value, searchQuery.value, page.value)
+    : await fetchInboxEmails(activeId.value, activeFolder.value, page.value);
+  if (!error && data) {
+    emails.value = data.emails;
+    total.value = data.total;
+  }
+  loading.value = false;
+}
+
+function onPageChange(p: string | number) {
+  page.value = Number(p);
+  loadEmails();
+}
+
+async function switchConfig(id: string) {
+  activeId.value = id;
+  activeFolder.value = 'INBOX';
+  page.value = 1;
+  isSearching.value = false;
+  searchQuery.value = '';
+  await loadFolders();
+  await loadEmails();
+}
+
+async function switchFolder(name: string) {
+  activeFolder.value = name;
+  page.value = 1;
+  isSearching.value = false;
+  searchQuery.value = '';
+  await loadEmails();
+}
+
 async function autoSync() {
   if (!activeId.value || syncing.value) return;
   syncing.value = true;
   const { error } = await syncInbox(activeId.value);
   if (!error) {
-    // 延迟后刷新
     setTimeout(async () => {
       await loadFolders();
       await loadEmails();
@@ -64,42 +110,20 @@ async function autoSync() {
   }
 }
 
-async function loadFolders() {
-  if (!activeId.value) return;
-  const { data, error } = await fetchInboxFolders(activeId.value);
-  if (!error && data) {
-    folders.value = data.folders;
-  }
-}
-
-async function loadEmails() {
-  if (!activeId.value) return;
-  loading.value = true;
-  const { data, error } = await fetchInboxEmails(activeId.value, activeFolder.value, page.value);
-  if (!error && data) {
-    emails.value = data.emails;
-    total.value = data.total;
-  }
-  loading.value = false;
-}
-
-async function switchConfig(id: string) {
-  activeId.value = id;
-  activeFolder.value = 'INBOX';
-  page.value = 1;
-  await loadFolders();
-  await loadEmails();
-}
-
-async function switchFolder(name: string) {
-  activeFolder.value = name;
-  page.value = 1;
-  await loadEmails();
-}
-
 async function handleSync() {
   message.success('同步任务已提交，正在后台处理...');
   await autoSync();
+}
+
+async function handleSearch() {
+  if (!searchQuery.value.trim()) {
+    isSearching.value = false;
+    await loadEmails();
+    return;
+  }
+  isSearching.value = true;
+  page.value = 1;
+  await loadEmails();
 }
 
 async function openDetail(id: string) {
@@ -112,6 +136,17 @@ async function openDetail(id: string) {
   }
 }
 
+async function toggleRead(email: InboxEmail) {
+  if (email.isRead) {
+    await markInboxEmailUnread(email.id);
+    email.isRead = false;
+  } else {
+    await markInboxEmailRead(email.id);
+    email.isRead = true;
+  }
+  message.success('已更新');
+}
+
 async function handleDelete(id: string) {
   const { error } = await deleteInboxEmail(id);
   if (!error) {
@@ -119,6 +154,31 @@ async function handleDelete(id: string) {
     emails.value = emails.value.filter(e => e.id !== id);
     total.value--;
   }
+}
+
+// 回复
+function reply() {
+  if (!detailEmail.value) return;
+  const to = detailEmail.value.from;
+  const subject = detailEmail.value.subject.startsWith('Re:') ? detailEmail.value.subject : `Re: ${detailEmail.value.subject}`;
+  const body = detailEmail.value.text || detailEmail.value.html || '';
+  router.push({
+    path: '/compose',
+    query: { to, subject, replyBody: body }
+  });
+  showDetail.value = false;
+}
+
+// 转发
+function forward() {
+  if (!detailEmail.value) return;
+  const subject = detailEmail.value.subject.startsWith('Fwd:') ? detailEmail.value.subject : `Fwd: ${detailEmail.value.subject}`;
+  const body = detailEmail.value.text || detailEmail.value.html || '';
+  router.push({
+    path: '/compose',
+    query: { subject, forwardBody: body }
+  });
+  showDetail.value = false;
 }
 
 function formatDate(dateStr: string) {
@@ -129,6 +189,14 @@ function formatDate(dateStr: string) {
 
 function stripHtml(html: string) {
   return html.replace(/<[^>]+>/g, '').substring(0, 200);
+}
+
+function downloadAttachment(index: string | number) {
+  if (!detailEmail.value) return;
+  const att = attachments.value[Number(index)];
+  if (!att) return;
+  const url = `/api/inbox/attachment/${detailEmail.value.id}/${index}`;
+  window.open(url, '_blank');
 }
 </script>
 
@@ -145,10 +213,9 @@ function stripHtml(html: string) {
     </div>
 
     <NAlert type="info" :bordered="false">
-      在【发件配置】中为邮箱配置 IMAP 收件服务器后，即可在此统一查看邮件。QQ邮箱需开启 IMAP 服务并获取授权码。
+      在【发件配置】中为邮箱配置 IMAP 收件服务器后，即可在此统一处理邮件。
     </NAlert>
 
-    <!-- 配置选择 -->
     <NSpace v-if="configs.length > 0">
       <NTag v-for="cfg in configs" :key="cfg.id" :bordered="false"
         :type="activeId === cfg.id ? 'primary' : 'default'" style="cursor: pointer;" @click="switchConfig(cfg.id)">
@@ -156,20 +223,20 @@ function stripHtml(html: string) {
       </NTag>
     </NSpace>
 
-    <!-- 邮件列表 -->
     <NCard :bordered="false" class="card-wrapper" v-if="activeId">
       <template #header>
         <div class="flex-y-center justify-between">
-          <span>{{ activeConfig?.name || '' }}</span>
-          <span class="text-14px text-#999">共 {{ total }} 封</span>
+          <span>{{ activeConfig?.name || '' }} - 共 {{ total }} 封</span>
+          <NInput v-model:value="searchQuery" placeholder="搜索主题/发件人/收件人" clearable style="width: 260px;"
+            @keyup.enter="handleSearch" @clear="handleSearch">
+            <template #prefix><span class="text-#999">🔍</span></template>
+          </NInput>
         </div>
       </template>
 
-      <!-- 文件夹分类 -->
       <div class="flex-y-center gap-8px mb-12px" v-if="folderTabs.length > 0">
         <NTag v-for="tab in folderTabs" :key="tab.value" :bordered="false"
-          :type="activeFolder === tab.value ? 'primary' : 'default'"
-          style="cursor: pointer;" @click="switchFolder(tab.value)">
+          :type="activeFolder === tab.value ? 'primary' : 'default'" style="cursor: pointer;" @click="switchFolder(tab.value)">
           {{ tab.label }}
         </NTag>
       </div>
@@ -192,7 +259,7 @@ function stripHtml(html: string) {
         </div>
 
         <div class="flex-y-center justify-center mt-16px" v-if="total > 0">
-          <NPagination :page="page" :page-size="20" :item-count="total" @update:page="p => { page = p; loadEmails(); }" />
+          <NPagination :page="page" :page-size="20" :item-count="total" @update:page="onPageChange" />
         </div>
       </NSpin>
     </NCard>
@@ -200,7 +267,7 @@ function stripHtml(html: string) {
     <NEmpty v-if="configs.length === 0" description="暂无配置 IMAP 的发件配置，请先到发件配置中设置" />
 
     <!-- 邮件详情弹窗 -->
-    <NModal v-model:show="showDetail" preset="card" style="width: 700px; max-height: 80vh; overflow-y: auto;" :title="detailEmail?.subject || '邮件详情'">
+    <NModal v-model:show="showDetail" preset="card" class="w-4/5 max-w-800px" :title="detailEmail?.subject || '邮件详情'">
       <template v-if="detailEmail">
         <div class="mb-16px">
           <div class="text-14px text-#999">发件人：{{ detailEmail.from }}</div>
@@ -210,12 +277,26 @@ function stripHtml(html: string) {
         </div>
         <div v-if="detailEmail.html" class="email-content" v-html="detailEmail.html" />
         <div v-else-if="detailEmail.text" class="email-content" style="white-space: pre-wrap;">{{ detailEmail.text }}</div>
-        <div v-else class="text-#999">(无内容)</div>
+        <div v-else class="text-#999">(正文加载中...)</div>
+
+        <!-- 附件 -->
+        <div v-if="attachments.length > 0" class="mt-16px">
+          <div class="text-14px font-medium mb-8px">附件 ({{ attachments.length }})</div>
+          <div v-for="(att, i) in attachments" :key="i" class="attachment-item">
+            <span>{{ att.filename }}</span>
+            <NButton size="small" type="primary" quaternary @click="downloadAttachment(i)">下载</NButton>
+          </div>
+        </div>
       </template>
       <template #footer>
-        <NSpace justify="end">
+        <NSpace justify="space-between">
+          <NSpace>
+            <NButton @click="toggleRead(detailEmail!)">{{ detailEmail?.isRead ? '标为未读' : '标为已读' }}</NButton>
+            <NButton @click="reply">回复</NButton>
+            <NButton @click="forward">转发</NButton>
+            <NButton type="error" @click="handleDelete(detailEmail!.id); showDetail = false;">删除</NButton>
+          </NSpace>
           <NButton @click="showDetail = false">关闭</NButton>
-          <NButton type="error" @click="handleDelete(detailEmail!.id); showDetail = false;">删除</NButton>
         </NSpace>
       </template>
     </NModal>
@@ -236,4 +317,8 @@ html.dark .email-item:hover { background: #2a2a2a; }
 html.dark .email-item.email-unread { background: #1a2a3a; }
 .email-content { padding: 16px; border: 1px solid #efefef; border-radius: 4px; min-height: 100px; }
 html.dark .email-content { border-color: #333; }
+.attachment-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; border: 1px solid #efefef; border-radius: 4px; margin-bottom: 8px;
+}
 </style>

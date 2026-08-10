@@ -271,16 +271,15 @@ export class InboxService {
 
   // ============ 邮件列表 ============
 
-  async listEmails(accountId: string, folder: string = 'INBOX', page: number = 1, pageSize: number = 20): Promise<{ emails: InboxEmail[]; total: number }> {
+  async listEmails(accountId: string, folder: string = 'INBOX', page: number = 1, pageSize: number = 20, search?: string): Promise<{ emails: InboxEmail[]; total: number }> {
     const offset = (page - 1) * pageSize;
-    const folderClause = folder === 'ALL' ? '' : 'AND folder = ?';
-    const folderParams = folder === 'ALL' ? [] : [folder];
-    const { total } = await this.env.DB.prepare(
-      `SELECT COUNT(*) as total FROM inbox_emails WHERE account_id = ? AND user_id = ? ${folderClause}`
-    ).bind(accountId, this.userId, ...folderParams).first<any>();
-    const { results } = await this.env.DB.prepare(
-      `SELECT id, account_id, user_id, uid, folder, sender, recipient, cc, subject, html, text, attachments, flags, internal_date, is_read, created_at FROM inbox_emails WHERE account_id = ? AND user_id = ? ${folderClause} ORDER BY internal_date DESC LIMIT ? OFFSET ?`
-    ).bind(accountId, this.userId, ...folderParams, pageSize, offset).all<any>();
+    const clauses: string[] = ['account_id = ?', 'user_id = ?'];
+    const params: any[] = [accountId, this.userId];
+    if (folder !== 'ALL') { clauses.push('folder = ?'); params.push(folder); }
+    if (search) { clauses.push('(subject LIKE ? OR sender LIKE ? OR recipient LIKE ?)'); const s = `%${search}%`; params.push(s, s, s); }
+    const where = clauses.join(' AND ');
+    const { total } = await this.env.DB.prepare(`SELECT COUNT(*) as total FROM inbox_emails WHERE ${where}`).bind(...params).first<any>();
+    const { results } = await this.env.DB.prepare(`SELECT id, account_id, user_id, uid, folder, sender, recipient, cc, subject, html, text, attachments, flags, internal_date, is_read, created_at FROM inbox_emails WHERE ${where} ORDER BY internal_date DESC LIMIT ? OFFSET ?`).bind(...params, pageSize, offset).all<any>();
     return {
       emails: results.map(r => this.mapEmail(r)),
       total: total || 0
@@ -313,12 +312,50 @@ export class InboxService {
       'SELECT id, account_id, user_id, uid, folder, sender, recipient, cc, subject, html, text, attachments, flags, internal_date, is_read, created_at FROM inbox_emails WHERE id = ? AND user_id = ?'
     ).bind(id, this.userId).first<any>();
     if (!row) return null;
-    if (!row.is_read) {
-      await this.env.DB.prepare('UPDATE inbox_emails SET is_read = 1 WHERE id = ?').bind(id).run();
+    return this.mapEmail(row);
+  }
+
+  /** 标记已读（同时同步到服务器） */
+  async markAsRead(id: string): Promise<void> {
+    await this.env.DB.prepare('UPDATE inbox_emails SET is_read = 1 WHERE id = ? AND user_id = ?').bind(id, this.userId).run();
+    // 尝试同步到服务器（后台非阻塞）
+    this.syncReadStatusToServer(id, true).catch(() => {});
+  }
+
+  /** 标记未读 */
+  async markAsUnread(id: string): Promise<void> {
+    await this.env.DB.prepare('UPDATE inbox_emails SET is_read = 0 WHERE id = ? AND user_id = ?').bind(id, this.userId).run();
+  }
+
+  /** 同步已读状态到 IMAP 服务器 */
+  private async syncReadStatusToServer(id: string, isRead: boolean): Promise<void> {
+    try {
+      const row = await this.env.DB.prepare(
+        'SELECT account_id, uid, folder FROM inbox_emails WHERE id = ? AND user_id = ?'
+      ).bind(id, this.userId).first<any>();
+      if (!row) return;
+      const full = await this.smtpService.getFullConfig(row.account_id);
+      if (!full || !full.config.imapHost) return;
+      const imap = this.createImap(full, full.imapPassword || full.password);
+      await imap.connect();
+      await imap.selectFolder(row.folder || 'INBOX');
+      if (isRead) {
+        await imap.storeFlags(`${row.uid}`, ['Seen'], 'add', true);
+      }
+      await imap.logout().catch(() => {});
+    } catch (e) {
+      console.error('Failed to sync read status to server:', e);
     }
-    const email = this.mapEmail(row);
-    email.isRead = true;
-    return email;
+  }
+
+  /** 搜索邮件 */
+  async searchEmails(accountId: string, query: string, page: number = 1, pageSize: number = 20): Promise<{ emails: InboxEmail[]; total: number }> {
+    return this.listEmails(accountId, 'ALL', page, pageSize, query);
+  }
+
+  /** 获取附件下载链接 */
+  getAttachmentDownloadUrl(emailId: string, index: number): string {
+    return `/api/inbox/attachment/${emailId}/${index}`;
   }
 
   async deleteEmail(id: string): Promise<void> {
