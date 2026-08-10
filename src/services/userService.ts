@@ -350,30 +350,38 @@ export class UserService {
           user_id TEXT NOT NULL,
           name TEXT NOT NULL,
           key_hash TEXT NOT NULL,
+          key_prefix TEXT,
+          key_suffix TEXT,
           expires_at INTEGER,
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL
         )
       `).run();
     }
+    // 确保 key_prefix/key_suffix 列存在（兼容旧表）
+    try { await this.env.DB.prepare("ALTER TABLE api_keys ADD COLUMN key_prefix TEXT").run(); } catch {}
+    try { await this.env.DB.prepare("ALTER TABLE api_keys ADD COLUMN key_suffix TEXT").run(); } catch {}
     const { key, hash } = await createApiKeyToken();
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
     const expiresAt = expiresInDays ? Date.now() + expiresInDays * 86400_000 : null;
+    const keyPrefix = key.slice(0, 6);
+    const keySuffix = key.slice(-4);
     await this.env.DB.prepare(
-      'INSERT INTO api_keys (id, user_id, name, key_hash, expires_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).bind(id, userId, name, hash, expiresAt, now, now).run();
+      'INSERT INTO api_keys (id, user_id, name, key_hash, key_prefix, key_suffix, expires_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).bind(id, userId, name, hash, keyPrefix, keySuffix, expiresAt, now, now).run();
     return { id, key, expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null };
   }
 
   // 列出所有 API Key
-  async listApiKeys(userId: string): Promise<{ id: string; name: string; expiresAt: string | null; createdAt: string }[]> {
+  async listApiKeys(userId: string): Promise<{ id: string; name: string; maskedKey: string; expiresAt: string | null; createdAt: string }[]> {
     const { results } = await this.env.DB.prepare(
-      'SELECT id, name, expires_at, created_at FROM api_keys WHERE user_id = ? ORDER BY created_at DESC'
-    ).bind(userId).all<{ id: string; name: string; expires_at: number | null; created_at: string }>();
+      'SELECT id, name, key_prefix, key_suffix, expires_at, created_at FROM api_keys WHERE user_id = ? ORDER BY created_at DESC'
+    ).bind(userId).all<{ id: string; name: string; key_prefix: string; key_suffix: string; expires_at: number | null; created_at: string }>();
     return results.map(r => ({
       id: r.id,
       name: r.name,
+      maskedKey: `${r.key_prefix || '……'}****${r.key_suffix || ''}`,
       expiresAt: r.expires_at ? new Date(r.expires_at).toISOString() : null,
       createdAt: r.created_at
     }));

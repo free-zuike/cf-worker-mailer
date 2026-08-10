@@ -134,11 +134,17 @@ export async function initDatabase(env: Env) {
             user_id TEXT NOT NULL,
             name TEXT NOT NULL,
             key_hash TEXT NOT NULL,
+            key_prefix TEXT,
+            key_suffix TEXT,
             expires_at INTEGER,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
           )
         `).run();
+      } else {
+        // 迁移：添加 key_prefix/key_suffix 列
+        try { await env.DB.prepare("ALTER TABLE api_keys ADD COLUMN key_prefix TEXT").run(); } catch {}
+        try { await env.DB.prepare("ALTER TABLE api_keys ADD COLUMN key_suffix TEXT").run(); } catch {}
       }
       // 迁移：为 smtp_configs 添加 IMAP 字段
       try {
@@ -295,6 +301,8 @@ export async function initDatabase(env: Env) {
         user_id TEXT NOT NULL,
         name TEXT NOT NULL,
         key_hash TEXT NOT NULL,
+        key_prefix TEXT,
+        key_suffix TEXT,
         expires_at INTEGER,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL

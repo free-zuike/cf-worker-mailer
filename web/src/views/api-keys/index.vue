@@ -27,11 +27,12 @@ const expiresOptions = [
 ];
 
 const columns = [
-  { title: '名称', key: 'name', width: 160 },
+  { title: '名称', key: 'name', width: 140 },
+  { title: 'API Key', key: 'maskedKey', width: 200 },
   {
     title: '有效期',
     key: 'expiresAt',
-    width: 200,
+    width: 180,
     render: (row: ApiKey) => row.expiresAt ? new Date(row.expiresAt).toLocaleString('zh-CN') : '永久有效'
   },
   { title: '创建时间', key: 'createdAt', width: 200, render: (row: ApiKey) => new Date(row.createdAt).toLocaleString('zh-CN') },

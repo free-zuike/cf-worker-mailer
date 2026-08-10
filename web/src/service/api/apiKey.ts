@@ -3,6 +3,7 @@ import { request } from '../request';
 export interface ApiKey {
   id: string;
   name: string;
+  maskedKey: string;
   expiresAt: string | null;
   createdAt: string;
 }
