@@ -135,7 +135,8 @@ export async function initDatabase(env: Env) {
             name TEXT NOT NULL,
             key_hash TEXT NOT NULL,
             expires_at INTEGER,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
           )
         `).run();
       }
@@ -295,7 +296,8 @@ export async function initDatabase(env: Env) {
         name TEXT NOT NULL,
         key_hash TEXT NOT NULL,
         expires_at INTEGER,
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
       )
     `).run();
 

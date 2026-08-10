@@ -351,7 +351,8 @@ export class UserService {
           name TEXT NOT NULL,
           key_hash TEXT NOT NULL,
           expires_at INTEGER,
-          created_at TEXT NOT NULL
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
         )
       `).run();
     }
@@ -360,8 +361,8 @@ export class UserService {
     const now = new Date().toISOString();
     const expiresAt = expiresInDays ? Date.now() + expiresInDays * 86400_000 : null;
     await this.env.DB.prepare(
-      'INSERT INTO api_keys (id, user_id, name, key_hash, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-    ).bind(id, userId, name, hash, expiresAt, now).run();
+      'INSERT INTO api_keys (id, user_id, name, key_hash, expires_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).bind(id, userId, name, hash, expiresAt, now, now).run();
     return { id, key, expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null };
   }
 
