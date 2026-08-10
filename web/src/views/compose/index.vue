@@ -143,6 +143,7 @@ async function handleSend() {
     localStg.set('lastConfigId', form.configId || '');
     message.success('邮件已发送');
     // 保留收件人，方便连续发送；清空其他字段
+    form.templateId = null;
     ccInput.value = '';
     bccInput.value = '';
     form.subject = '';
