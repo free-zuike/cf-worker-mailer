@@ -48,10 +48,18 @@ inbox.get('/emails/:configId', async (c) => {
   return c.json(result);
 });
 
-// 获取邮件详情
+// 获取邮件详情（按需拉取完整内容）
 inbox.get('/email/:id', async (c) => {
   const svc = new InboxService(c.env, c.get('user').id);
   const email = await svc.getEmail(c.req.param('id'));
+  if (!email) return c.json({ error: '邮件不存在' }, 404);
+  return c.json({ email });
+});
+
+// 获取邮件完整内容（正文，按需从 IMAP 拉取）
+inbox.get('/email/:id/full', async (c) => {
+  const svc = new InboxService(c.env, c.get('user').id);
+  const email = await svc.fetchEmailContent(c.req.param('id'));
   if (!email) return c.json({ error: '邮件不存在' }, 404);
   return c.json({ email });
 });

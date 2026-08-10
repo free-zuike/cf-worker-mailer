@@ -2,7 +2,7 @@
 import { onMounted, ref, computed } from 'vue';
 import { useMessage } from 'naive-ui';
 import { useRouter } from 'vue-router';
-import { fetchInboxConfigs, fetchInboxEmails, fetchInboxEmail, deleteInboxEmail, syncInbox, fetchInboxFolders, type InboxEmail, type InboxFolder } from '@/service/api/inbox';
+import { fetchInboxConfigs, fetchInboxEmails, fetchInboxEmailFull, deleteInboxEmail, syncInbox, fetchInboxFolders, type InboxEmail, type InboxFolder } from '@/service/api/inbox';
 import type { SmtpConfig } from '@/service/api/smtp';
 
 const message = useMessage();
@@ -89,7 +89,7 @@ async function handleSync() {
 }
 
 async function openDetail(id: string) {
-  const { data, error } = await fetchInboxEmail(id);
+  const { data, error } = await fetchInboxEmailFull(id);
   if (!error && data) {
     detailEmail.value = data.email;
     showDetail.value = true;

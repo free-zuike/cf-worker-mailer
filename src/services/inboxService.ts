@@ -159,14 +159,15 @@ export class InboxService {
 
     if (fetchRange[0] > fetchRange[1]) return { synced: 0, errors: 0 };
 
+    // 只拉取头部信息，不拉取正文（节省 CPU）
     const batchSize = 10;
     for (let start = fetchRange[0]; start <= fetchRange[1]; start += batchSize) {
       const end = Math.min(start + batchSize - 1, fetchRange[1]);
       try {
-        const emails = await imap.fetchEmails({ limit: [start, end], fetchBody: true, peek: true, useUid: maxUid > 0 });
+        const emails = await imap.fetchEmails({ limit: [start, end], fetchBody: false, peek: true, useUid: maxUid > 0 });
         for (const email of emails) {
           try {
-            await this.storeEmail(configId, email, folderName);
+            await this.storeEmail(configId, email, folderName, false);
             synced++;
           } catch (e) {
             console.error('Failed to store email:', e);
@@ -187,7 +188,7 @@ export class InboxService {
     await this.env.DB.prepare('UPDATE smtp_configs SET updated_at = ? WHERE id = ?').bind(now, accountId).run();
   }
 
-  private async storeEmail(accountId: string, email: any, folder: string): Promise<void> {
+  private async storeEmail(accountId: string, email: any, folder: string, hasContent: boolean): Promise<void> {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
     const existing = await this.env.DB.prepare(
@@ -203,14 +204,63 @@ export class InboxService {
       email.to?.join(', ') || '',
       email.cc?.join(', ') || '',
       email.subject || '',
-      email.body?.html || '',
-      email.body?.text || '',
-      JSON.stringify(email.attachments || []),
+      hasContent ? (email.body?.html || '') : '',
+      hasContent ? (email.body?.text || '') : '',
+      hasContent ? JSON.stringify(email.attachments || []) : '[]',
       JSON.stringify(email.flags || []),
       email.internalDate ? new Date(email.internalDate).toISOString() : now,
       (email.flags || []).includes('Seen') ? 1 : 0,
       now
     ).run();
+  }
+
+  /** 获取某封邮件的完整内容（按需拉取，连接 IMAP 获取正文） */
+  async fetchEmailContent(id: string): Promise<InboxEmail | null> {
+    const row = await this.env.DB.prepare(
+      'SELECT id, account_id, user_id, uid, folder, sender, recipient, cc, subject, html, text, attachments, flags, internal_date, is_read, created_at FROM inbox_emails WHERE id = ? AND user_id = ?'
+    ).bind(id, this.userId).first<any>();
+    if (!row) return null;
+
+    // 如果已有正文，直接返回
+    if (row.html || row.text) {
+      if (!row.is_read) {
+        await this.env.DB.prepare('UPDATE inbox_emails SET is_read = 1 WHERE id = ?').bind(id).run();
+      }
+      const email = this.mapEmail(row);
+      email.isRead = true;
+      return email;
+    }
+
+    // 否则连接 IMAP 拉取完整内容
+    try {
+      const full = await this.smtpService.getFullConfig(row.account_id);
+      if (!full || !full.config.imapHost) return this.mapEmail(row);
+
+      const imap = this.createImap(full, full.imapPassword || full.password);
+      await imap.connect();
+      await imap.selectFolder(row.folder || 'INBOX');
+      const emails = await imap.fetchEmails({ limit: [row.uid, row.uid], useUid: true, fetchBody: true, peek: true });
+      await imap.logout().catch(() => {});
+
+      if (emails.length > 0) {
+        const email = emails[0];
+        await this.env.DB.prepare(
+          'UPDATE inbox_emails SET html = ?, text = ?, attachments = ?, is_read = 1 WHERE id = ?'
+        ).bind(email.body?.html || '', email.body?.text || '', JSON.stringify(email.attachments || []), id).run();
+        row.html = email.body?.html || '';
+        row.text = email.body?.text || '';
+        row.attachments = JSON.stringify(email.attachments || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch email content:', e);
+    }
+
+    if (!row.is_read) {
+      await this.env.DB.prepare('UPDATE inbox_emails SET is_read = 1 WHERE id = ?').bind(id).run();
+    }
+    const email = this.mapEmail(row);
+    email.isRead = true;
+    return email;
   }
 
   // ============ 邮件列表 ============

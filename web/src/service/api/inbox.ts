@@ -51,6 +51,11 @@ export function fetchInboxEmail(id: string) {
   return request<{ email: InboxEmail }>({ url: `/inbox/email/${id}` });
 }
 
+// 获取邮件完整内容（正文，按需拉取）
+export function fetchInboxEmailFull(id: string) {
+  return request<{ email: InboxEmail }>({ url: `/inbox/email/${id}/full` });
+}
+
 // 删除邮件
 export function deleteInboxEmail(id: string) {
   return request<{ success: boolean }>({ url: `/inbox/email/${id}`, method: 'delete' });
