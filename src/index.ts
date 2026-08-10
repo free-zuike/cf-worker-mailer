@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import type { Env } from '../types';
 import api from './routes/api';
+import mcp from './routes/mcp';
 import { EmailService } from './services/emailService';
 import { initDatabase } from './db/init';
 
@@ -59,6 +60,9 @@ app.get('/api/uploads/*', async (c) => {
 
 // API 路由
 app.route('/api', api);
+
+// MCP Server（AI 模型调用接口）
+app.route('/mcp', mcp);
 
 // 静态资源（前端）- 访问首页时自动初始化数据库
 app.get('*', async (c) => {
