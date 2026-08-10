@@ -15,8 +15,10 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "cf-imap": "^1.0.0",
     "hono": "^4.6.0",
     "pinia": "^3.0.4",
+    "postal-mime": "^2.7.6",
     "vue": "^3.4.0",
     "vue-router": "^4.3.0",
     "worker-mailer": "^1.2.1",

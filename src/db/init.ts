@@ -44,6 +44,73 @@ export async function initDatabase(env: Env) {
           )
         `).run();
       }
+      // 检查 inbox_accounts 表
+      const inboxAccountsTable = await env.DB.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='inbox_accounts'"
+      ).first();
+      if (!inboxAccountsTable) {
+        console.log('Creating inbox_accounts table...');
+        await env.DB.prepare(`
+          CREATE TABLE inbox_accounts (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            host TEXT NOT NULL,
+            port INTEGER NOT NULL,
+            username TEXT NOT NULL,
+            password TEXT NOT NULL,
+            use_tls INTEGER DEFAULT 1,
+            sync_interval INTEGER DEFAULT 15,
+            last_sync_at TEXT,
+            enabled INTEGER DEFAULT 1,
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+          )
+        `).run();
+      }
+      // 检查 inbox_emails 表
+      const inboxEmailsTable = await env.DB.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='inbox_emails'"
+      ).first();
+      if (!inboxEmailsTable) {
+        console.log('Creating inbox_emails table...');
+        await env.DB.prepare(`
+          CREATE TABLE inbox_emails (
+            id TEXT PRIMARY KEY,
+            account_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            uid INTEGER NOT NULL,
+            sender TEXT,
+            recipient TEXT,
+            cc TEXT,
+            subject TEXT,
+            html TEXT,
+            text TEXT,
+            attachments TEXT,
+            flags TEXT,
+            internal_date TEXT,
+            is_read INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL,
+            UNIQUE(account_id, uid)
+          )
+        `).run();
+      }
+      // 检查 contacts 表
+      const contactsTableCheck = await env.DB.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='contacts'"
+      ).first();
+      if (!contactsTableCheck) {
+        console.log('Creating contacts table...');
+        await env.DB.prepare(`
+          CREATE TABLE contacts (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL,
+            remark TEXT,
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+          )
+        `).run();
+      }
       return;
     }
 
@@ -142,6 +209,38 @@ export async function initDatabase(env: Env) {
         email TEXT NOT NULL,
         remark TEXT,
         created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      )
+    `).run();
+
+    await env.DB.prepare(`
+      CREATE TABLE inbox_accounts (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        host TEXT NOT NULL,
+        port INTEGER NOT NULL,
+        username TEXT NOT NULL,
+        password TEXT NOT NULL,
+        use_tls INTEGER DEFAULT 1,
+        sync_interval INTEGER DEFAULT 15,
+        last_sync_at TEXT,
+        enabled INTEGER DEFAULT 1,
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      )
+    `).run();
+
+    await env.DB.prepare(`
+      CREATE TABLE inbox_emails (
+        id TEXT PRIMARY KEY,
+        account_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        uid INTEGER NOT NULL,
+        sender TEXT, recipient TEXT, cc TEXT, subject TEXT,
+        html TEXT, text TEXT, attachments TEXT, flags TEXT,
+        internal_date TEXT,
+        is_read INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL,
+        UNIQUE(account_id, uid)
       )
     `).run();
 

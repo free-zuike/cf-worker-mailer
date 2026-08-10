@@ -26,6 +26,8 @@ declare module "@elegant-router/types" {
     "history": "/history";
     "home": "/home";
     "iframe-page": "/iframe-page/:url";
+    "inbox": "/inbox";
+    "inbox-account": "/inbox-account";
     "login": "/login/:module(pwd-login|code-login|register|reset-pwd|bind-wechat)?";
     "oauth-callback": "/oauth-callback";
     "settings": "/settings";
@@ -72,6 +74,8 @@ declare module "@elegant-router/types" {
     | "history"
     | "home"
     | "iframe-page"
+    | "inbox"
+    | "inbox-account"
     | "login"
     | "oauth-callback"
     | "settings"
@@ -104,6 +108,8 @@ declare module "@elegant-router/types" {
     | "global-variables"
     | "history"
     | "home"
+    | "inbox-account"
+    | "inbox"
     | "oauth-callback"
     | "settings"
     | "smtp"

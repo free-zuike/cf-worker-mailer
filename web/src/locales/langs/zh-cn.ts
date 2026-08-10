@@ -234,6 +234,8 @@ const local: App.I18n.Schema = {
     settings: '系统设置',
     'global-variables': '全局变量',
     contacts: '联系人',
+    inbox: '收件箱',
+    'inbox-account': '收件账户',
     'oauth-callback': 'OAuth 回调'
   },
   page: {

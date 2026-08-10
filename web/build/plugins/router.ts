@@ -26,17 +26,19 @@ export function setupElegantRouter() {
 
       const constantRoutes: RouteKey[] = ['login', '403', '404', '500'];
 
-      const hideInMenuRoutes: RouteKey[] = ['login', '403', '404', '500', 'template-edit', 'oauth-callback', 'iframe-page'];
+      const hideInMenuRoutes: RouteKey[] = ['login', '403', '404', '500', 'template-edit', 'oauth-callback', 'iframe-page', 'inbox-account'];
 
       const menuConfig: Record<string, { order: number; icon: string }> = {
         home: { order: 1, icon: 'mdi:monitor-dashboard' },
         compose: { order: 2, icon: 'mdi:email-plus-outline' },
-        smtp: { order: 3, icon: 'mdi:server' },
-        templates: { order: 4, icon: 'mdi:file-document-outline' },
-        history: { order: 5, icon: 'mdi:history' },
-        'global-variables': { order: 7, icon: 'mdi:variable' },
-        contacts: { order: 8, icon: 'mdi:book-account-outline' },
-        settings: { order: 6, icon: 'mdi:cog-outline' }
+        inbox: { order: 3, icon: 'mdi:email-open-outline' },
+        'inbox-account': { order: 3, icon: 'mdi:email-account' },
+        smtp: { order: 4, icon: 'mdi:server' },
+        templates: { order: 5, icon: 'mdi:file-document-outline' },
+        history: { order: 6, icon: 'mdi:history' },
+        settings: { order: 7, icon: 'mdi:cog-outline' },
+        'global-variables': { order: 8, icon: 'mdi:variable' },
+        contacts: { order: 9, icon: 'mdi:book-account-outline' }
       };
 
       const meta: Partial<RouteMeta> = {

@@ -185,6 +185,61 @@ export interface UserPreferences {
   theme: 'light' | 'dark';
 }
 
+// ==================== 收件箱相关类型 ====================
+export interface InboxAccount {
+  id: string;
+  userId: string;
+  name: string;
+  host: string;
+  port: number;
+  username: string;
+  useTls: boolean;
+  syncInterval: number; // 同步间隔（分钟），默认 15
+  lastSyncAt?: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateInboxAccountRequest {
+  name: string;
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+  useTls?: boolean;
+  syncInterval?: number;
+}
+
+export interface UpdateInboxAccountRequest {
+  name?: string;
+  host?: string;
+  port?: number;
+  username?: string;
+  password?: string;
+  useTls?: boolean;
+  syncInterval?: number;
+  enabled?: boolean;
+}
+
+export interface InboxEmail {
+  id: string;
+  accountId: string;
+  userId: string;
+  uid: number;
+  from: string;
+  to: string;
+  cc?: string;
+  subject: string;
+  html?: string;
+  text?: string;
+  attachments?: string; // JSON
+  flags?: string; // JSON
+  internalDate: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
 // ==================== 环境类型 ====================
 export interface Env {
   DB: D1Database;
