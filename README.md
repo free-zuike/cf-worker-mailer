@@ -93,56 +93,45 @@ npm run dev
 
 ## 部署
 
-### 1. 设置 Cloudflare
+### 一键部署（GitHub Actions，推荐）
+
+1. Fork 这个仓库到你的 GitHub
+
+2. 在 GitHub 仓库设置中添加以下 Secrets（Settings → Secrets and variables → Actions）：
+
+   | Secret | 说明 |
+   |--------|------|
+   | `CLOUDFLARE_API_TOKEN` | Cloudflare API Token（权限：Workers、D1、R2、Queues） |
+   | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare 账户 ID（在 Workers 页面右下角可找到） |
+   | `ENCRYPTION_KEY` | 加密密钥（任意 32 位以上随机字符串，务必保留！） |
+
+3. 推送到 `main` 分支，GitHub Actions 会自动：
+   - 创建 D1 数据库、R2 存储桶、队列
+   - 设置 `ENCRYPTION_KEY`
+   - 构建前端
+   - 部署 Worker
+
+### 手动部署
+
+如果不想用 GitHub Actions，也可以手动部署：
 
 ```bash
-# 登录 Cloudflare
+# 1. 登录 Cloudflare
 npx wrangler login
 
-# 创建 D1 数据库 (如果尚未创建)
+# 2. 创建资源
 npx wrangler d1 create worker-mailer-db
-```
-
-### 2. 更新 wrangler.toml
-
-将创建数据库时输出的 database_id 填入 wrangler.toml
-
-### 3. 执行数据库迁移
-
-```bash
-npx wrangler d1 migrations apply worker-mailer-db
-```
-
-### 4. 创建 R2 存储桶（用于图片上传）
-
-```bash
 npx wrangler r2 bucket create worker-mailer-uploads
-```
-
-### 5. 创建队列（用于异步收件箱同步）
-
-```bash
 npx wrangler queues create mailer-queue
-```
 
-### 6. 设置环境变量
+# 3. 将 D1 输出的 database_id 填入 wrangler.toml
 
-```bash
-# 加密密钥（必填，用于 SMTP 密码加密）
+# 4. 设置加密密钥（必填）
 npx wrangler secret put ENCRYPTION_KEY
 
-# 人机验证（可选，需要 Cloudflare Turnstile）
-npx wrangler secret put TURNSTILE_SECRET_KEY
-
-# GitHub OAuth（可选，需要 GitHub OAuth App）
-npx wrangler secret put GITHUB_CLIENT_ID
-npx wrangler secret put GITHUB_CLIENT_SECRET
-```
-
-### 7. 部署
-
-```bash
-npm run deploy
+# 5. 构建并部署
+npm run build
+npx wrangler deploy
 ```
 
 ## 项目结构
