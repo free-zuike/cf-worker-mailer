@@ -238,6 +238,14 @@ export class InboxService {
       await imap.connect();
       await imap.selectFolder(row.folder || 'INBOX');
       const emails = await imap.fetchEmails({ limit: [row.uid, row.uid], useUid: true, fetchBody: true, peek: true });
+
+      // 在服务器上标记已读（正常邮件客户端行为）
+      try {
+        await imap.storeFlags(`${row.uid}`, ['Seen'], 'add', true);
+      } catch (e) {
+        console.error('Failed to mark as read on server:', e);
+      }
+
       await imap.logout().catch(() => {});
 
       if (emails.length > 0) {
