@@ -2,7 +2,7 @@
 import { onMounted, ref, computed } from 'vue';
 import { useMessage } from 'naive-ui';
 import { useRouter } from 'vue-router';
-import { fetchInboxConfigs, fetchInboxEmails, fetchInboxEmail, deleteInboxEmail, syncInbox, type InboxEmail } from '@/service/api/inbox';
+import { fetchInboxConfigs, fetchInboxEmails, fetchInboxEmail, deleteInboxEmail, syncInbox, fetchInboxFolders, type InboxEmail, type InboxFolder } from '@/service/api/inbox';
 import type { SmtpConfig } from '@/service/api/smtp';
 
 const message = useMessage();
@@ -10,6 +10,8 @@ const router = useRouter();
 
 const configs = ref<SmtpConfig[]>([]);
 const activeId = ref<string | null>(null);
+const folders = ref<InboxFolder[]>([]);
+const activeFolder = ref('INBOX');
 const emails = ref<InboxEmail[]>([]);
 const total = ref(0);
 const page = ref(1);
@@ -20,20 +22,33 @@ const showDetail = ref(false);
 
 const activeConfig = computed(() => configs.value.find(c => c.id === activeId.value));
 
+const folderTabs = computed(() => {
+  return folders.value.map(f => ({ label: f.label, value: f.name }));
+});
+
 onMounted(async () => {
   const { data, error } = await fetchInboxConfigs();
   if (error) return;
   configs.value = data.configs;
   if (configs.value.length > 0) {
     activeId.value = configs.value[0].id;
+    await loadFolders();
     await loadEmails();
   }
 });
 
+async function loadFolders() {
+  if (!activeId.value) return;
+  const { data, error } = await fetchInboxFolders(activeId.value);
+  if (!error && data) {
+    folders.value = data.folders;
+  }
+}
+
 async function loadEmails() {
   if (!activeId.value) return;
   loading.value = true;
-  const { data, error } = await fetchInboxEmails(activeId.value, page.value);
+  const { data, error } = await fetchInboxEmails(activeId.value, activeFolder.value, page.value);
   if (!error && data) {
     emails.value = data.emails;
     total.value = data.total;
@@ -43,6 +58,14 @@ async function loadEmails() {
 
 async function switchConfig(id: string) {
   activeId.value = id;
+  activeFolder.value = 'INBOX';
+  page.value = 1;
+  await loadFolders();
+  await loadEmails();
+}
+
+async function switchFolder(name: string) {
+  activeFolder.value = name;
   page.value = 1;
   await loadEmails();
 }
@@ -53,8 +76,8 @@ async function handleSync() {
   const { error } = await syncInbox(activeId.value);
   if (!error) {
     message.success('同步任务已提交，正在后台处理...');
-    // 队列处理需要时间，延迟后刷新
     setTimeout(async () => {
+      await loadFolders();
       await loadEmails();
       syncing.value = false;
       message.success('同步完成');
@@ -123,10 +146,19 @@ function stripHtml(html: string) {
     <NCard :bordered="false" class="card-wrapper" v-if="activeId">
       <template #header>
         <div class="flex-y-center justify-between">
-          <span>{{ activeConfig?.name || '' }} - 收件箱</span>
+          <span>{{ activeConfig?.name || '' }}</span>
           <span class="text-14px text-#999">共 {{ total }} 封</span>
         </div>
       </template>
+
+      <!-- 文件夹分类 -->
+      <div class="flex-y-center gap-8px mb-12px" v-if="folderTabs.length > 0">
+        <NTag v-for="tab in folderTabs" :key="tab.value" :bordered="false"
+          :type="activeFolder === tab.value ? 'primary' : 'default'"
+          style="cursor: pointer;" @click="switchFolder(tab.value)">
+          {{ tab.label }}
+        </NTag>
+      </div>
 
       <NSpin :show="loading">
         <div v-if="emails.length === 0 && !loading" class="py-40px text-center text-#999">

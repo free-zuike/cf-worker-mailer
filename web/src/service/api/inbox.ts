@@ -5,6 +5,7 @@ export interface InboxEmail {
   id: string;
   accountId: string;
   uid: number;
+  folder?: string;
   from: string;
   to: string;
   cc?: string;
@@ -18,6 +19,13 @@ export interface InboxEmail {
   createdAt: string;
 }
 
+export interface InboxFolder {
+  name: string;
+  category: 'inbox' | 'spam' | 'drafts' | 'sent' | 'trash' | 'other';
+  label: string;
+  count: number;
+}
+
 // 获取支持 IMAP 的 SMTP 配置
 export function fetchInboxConfigs() {
   return request<{ configs: SmtpConfig[] }>({ url: '/inbox/configs' });
@@ -28,9 +36,14 @@ export function syncInbox(configId: string) {
   return request<{ synced: number; errors: number }>({ url: `/inbox/sync/${configId}`, method: 'post' });
 }
 
-// 列出邮件
-export function fetchInboxEmails(configId: string, page = 1, pageSize = 20) {
-  return request<{ emails: InboxEmail[]; total: number }>({ url: `/inbox/emails/${configId}`, params: { page, pageSize } });
+// 获取文件夹列表
+export function fetchInboxFolders(configId: string) {
+  return request<{ folders: InboxFolder[] }>({ url: `/inbox/folders/${configId}` });
+}
+
+// 列出邮件（支持文件夹筛选）
+export function fetchInboxEmails(configId: string, folder = 'INBOX', page = 1, pageSize = 20) {
+  return request<{ emails: InboxEmail[]; total: number }>({ url: `/inbox/emails/${configId}`, params: { folder, page, pageSize } });
 }
 
 // 邮件详情

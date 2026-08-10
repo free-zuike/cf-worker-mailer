@@ -239,6 +239,7 @@ export interface InboxEmail {
   accountId: string;
   userId: string;
   uid: number;
+  folder?: string;
   from: string;
   to: string;
   cc?: string;

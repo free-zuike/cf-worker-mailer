@@ -79,6 +79,7 @@ export async function initDatabase(env: Env) {
             account_id TEXT NOT NULL,
             user_id TEXT NOT NULL,
             uid INTEGER NOT NULL,
+            folder TEXT DEFAULT 'INBOX',
             sender TEXT,
             recipient TEXT,
             cc TEXT,
@@ -93,6 +94,11 @@ export async function initDatabase(env: Env) {
             UNIQUE(account_id, uid)
           )
         `).run();
+      } else {
+        // 迁移：添加 folder 字段
+        try {
+          await env.DB.prepare("ALTER TABLE inbox_emails ADD COLUMN folder TEXT DEFAULT 'INBOX'").run();
+        } catch {}
       }
       // 检查 contacts 表
       const contactsTableCheck = await env.DB.prepare(
@@ -249,6 +255,7 @@ export async function initDatabase(env: Env) {
         account_id TEXT NOT NULL,
         user_id TEXT NOT NULL,
         uid INTEGER NOT NULL,
+        folder TEXT DEFAULT 'INBOX',
         sender TEXT, recipient TEXT, cc TEXT, subject TEXT,
         html TEXT, text TEXT, attachments TEXT, flags TEXT,
         internal_date TEXT,

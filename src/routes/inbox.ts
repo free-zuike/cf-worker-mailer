@@ -27,12 +27,24 @@ inbox.post('/sync/:configId', async (c) => {
   return c.json({ message: '同步任务已提交，请稍后刷新查看' });
 });
 
-// 列出邮件
+// 获取文件夹列表
+inbox.get('/folders/:configId', async (c) => {
+  const svc = new InboxService(c.env, c.get('user').id);
+  try {
+    const folders = await svc.getFolders(c.req.param('configId'));
+    return c.json({ folders });
+  } catch (error) {
+    return c.json({ error: (error as Error).message }, 500);
+  }
+});
+
+// 列出邮件（支持文件夹筛选）
 inbox.get('/emails/:configId', async (c) => {
   const svc = new InboxService(c.env, c.get('user').id);
   const page = parseInt(c.req.query('page') || '1');
   const pageSize = parseInt(c.req.query('pageSize') || '20');
-  const result = await svc.listEmails(c.req.param('configId'), page, pageSize);
+  const folder = c.req.query('folder') || 'INBOX';
+  const result = await svc.listEmails(c.req.param('configId'), folder, page, pageSize);
   return c.json(result);
 });
 
