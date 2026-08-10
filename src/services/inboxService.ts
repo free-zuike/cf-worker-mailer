@@ -110,18 +110,22 @@ export class InboxService {
 
     try {
       await imap.connect();
-      // 获取所有文件夹
       const folders = await imap.getFolders('', '*');
-      // 优先同步主要文件夹
-      const mainFolders = folders.filter(f => {
-        const { category } = classifyFolder(f.name);
-        return category !== 'other';
+      console.log('[inbox] folders from server:', JSON.stringify(folders.map(f => ({ name: f.name, attrs: f.attributes }))));
+      // 过滤掉不可选择的文件夹（如 \Noselect）
+      const selectable = folders.filter(f => !f.attributes.includes('Noselect'));
+      // 按分类排序：收件箱优先，其他按分类顺序
+      const sorted = selectable.sort((a, b) => {
+        const { category: ca } = classifyFolder(a.name);
+        const { category: cb } = classifyFolder(b.name);
+        const order = ['inbox', 'sent', 'drafts', 'spam', 'trash', 'other'];
+        return order.indexOf(ca) - order.indexOf(cb);
       });
-      const foldersToSync = mainFolders.length > 0 ? mainFolders : folders;
 
-      for (const folderInfo of foldersToSync) {
+      for (const folderInfo of sorted) {
         try {
           const s = await this.syncFolder(imap, configId, folderInfo.name);
+          console.log(`[inbox] synced ${folderInfo.name}: ${s.synced} new, ${s.errors} errors`);
           synced += s.synced;
           errors += s.errors;
         } catch (e) {
