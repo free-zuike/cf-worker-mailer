@@ -63,35 +63,65 @@ export class InboxService {
       return { synced: 0, errors: 0 };
     }
 
-    const syncedUids = await this.getSyncedUids(configId);
+    // 获取已同步的最大 UID，只拉取新邮件
+    const maxUidRow = await this.env.DB.prepare(
+      'SELECT MAX(uid) as max_uid FROM inbox_emails WHERE account_id = ?'
+    ).bind(configId).first<any>();
+    const maxUid = maxUidRow?.max_uid || 0;
     let synced = 0, errors = 0;
 
-    const batchSize = 10;
-    for (let start = 1; start <= totalMessages; start += batchSize) {
-      const end = Math.min(start + batchSize - 1, totalMessages);
-      try {
-        const emails = await imap.fetchEmails({ limit: [start, end], fetchBody: true, peek: true });
-        for (const email of emails) {
-          if (syncedUids.has(email.uid)) continue;
-          try {
-            await this.storeEmail(configId, email);
-            synced++;
-          } catch (e) {
-            console.error('Failed to store email:', e);
-            errors++;
-          }
-        }
-      } catch (e) {
-        console.error('Batch failed, reconnecting...', start, '-', end, ':', e);
-        errors++;
-        // 断开后重新连接，从下一批继续
-        try { await imap.logout(); } catch {}
+    if (maxUid > 0) {
+      // 增量同步：只拉取新邮件
+      const uidNext = mailbox.uidNext || (maxUid + 1);
+      if (uidNext <= maxUid + 1) {
+        // 没有新邮件
+        await imap.logout();
+        await this.updateLastSync(configId);
+        return { synced: 0, errors: 0 };
+      }
+      const newUids = [maxUid + 1, uidNext - 1];
+      const batchSize = 10;
+      for (let start = newUids[0]; start <= newUids[1]; start += batchSize) {
+        const end = Math.min(start + batchSize - 1, newUids[1]);
         try {
-          await imap.connect();
-          await imap.selectFolder('INBOX');
-        } catch (reconnectErr) {
-          console.error('Reconnect failed, aborting sync:', reconnectErr);
-          break;
+          const emails = await imap.fetchEmails({ limit: [start, end], fetchBody: true, peek: true, useUid: true });
+          for (const email of emails) {
+            try {
+              await this.storeEmail(configId, email);
+              synced++;
+            } catch (e) {
+              console.error('Failed to store email:', e);
+              errors++;
+            }
+          }
+        } catch (e) {
+          console.error('Batch failed, reconnecting...', start, '-', end, ':', e);
+          errors++;
+          try { await imap.logout(); } catch {}
+          try { await imap.connect(); await imap.selectFolder('INBOX'); } catch { break; }
+        }
+      }
+    } else {
+      // 首次同步：全量拉取
+      const batchSize = 10;
+      for (let start = 1; start <= totalMessages; start += batchSize) {
+        const end = Math.min(start + batchSize - 1, totalMessages);
+        try {
+          const emails = await imap.fetchEmails({ limit: [start, end], fetchBody: true, peek: true });
+          for (const email of emails) {
+            try {
+              await this.storeEmail(configId, email);
+              synced++;
+            } catch (e) {
+              console.error('Failed to store email:', e);
+              errors++;
+            }
+          }
+        } catch (e) {
+          console.error('Batch failed, reconnecting...', start, '-', end, ':', e);
+          errors++;
+          try { await imap.logout(); } catch {}
+          try { await imap.connect(); await imap.selectFolder('INBOX'); } catch { break; }
         }
       }
     }
@@ -99,13 +129,6 @@ export class InboxService {
     await imap.logout();
     await this.updateLastSync(configId);
     return { synced, errors };
-  }
-
-  private async getSyncedUids(accountId: string): Promise<Set<number>> {
-    const { results } = await this.env.DB.prepare(
-      'SELECT uid FROM inbox_emails WHERE account_id = ?'
-    ).bind(accountId).all<any>();
-    return new Set(results.map(r => r.uid));
   }
 
   private async updateLastSync(accountId: string): Promise<void> {
