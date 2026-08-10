@@ -381,7 +381,7 @@ export class UserService {
     return results.map(r => ({
       id: r.id,
       name: r.name,
-      maskedKey: `${r.key_prefix || '……'}****${r.key_suffix || ''}`,
+      maskedKey: r.key_prefix ? `${r.key_prefix}****${r.key_suffix || ''}` : 'wk_****',
       expiresAt: r.expires_at ? new Date(r.expires_at).toISOString() : null,
       createdAt: r.created_at
     }));
