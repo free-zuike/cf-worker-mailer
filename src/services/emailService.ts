@@ -33,11 +33,12 @@ export class EmailService {
     if (request.templateId) {
       const template = await this.templateService.get(request.templateId);
       if (template) {
-        subject = template.subject;
-        if (template.htmlContent) {
+        // 用户如果自己提供了内容，优先用用户的；没提供才从模板取
+        if (!subject) subject = template.subject;
+        if (!html && template.htmlContent) {
           html = this.templateService.applyVariables(template.htmlContent, request.templateVariables || {}, template.variables);
         }
-        if (template.textContent) {
+        if (!text && template.textContent) {
           text = this.templateService.applyVariables(template.textContent, request.templateVariables || {}, template.variables);
         }
       }
