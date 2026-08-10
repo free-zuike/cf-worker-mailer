@@ -2,7 +2,7 @@
 import { onMounted, onUnmounted, ref, computed } from 'vue';
 import { useMessage } from 'naive-ui';
 import { useRouter } from 'vue-router';
-import { fetchInboxConfigs, fetchInboxEmails, fetchInboxEmailFull, deleteInboxEmail, syncInbox, fetchInboxFolders, markInboxEmailRead, markInboxEmailUnread, searchInboxEmails, type InboxEmail, type InboxFolder } from '@/service/api/inbox';
+import { fetchInboxConfigs, fetchInboxEmails, fetchInboxEmailFull, deleteInboxEmail, syncInbox, fetchInboxFolders, markInboxEmailRead, markInboxEmailUnread, toggleInboxStar, searchInboxEmails, type InboxEmail, type InboxFolder } from '@/service/api/inbox';
 import type { SmtpConfig } from '@/service/api/smtp';
 
 const message = useMessage();
@@ -147,6 +147,15 @@ async function toggleRead(email: InboxEmail) {
   message.success('已更新');
 }
 
+async function toggleStar(email: InboxEmail, e: Event) {
+  e.stopPropagation();
+  const { data, error } = await toggleInboxStar(email.id);
+  if (!error && data) {
+    email.starred = data.starred;
+    message.success(data.starred ? '已加星标' : '已取消星标');
+  }
+}
+
 async function handleDelete(id: string) {
   const { error } = await deleteInboxEmail(id);
   if (!error) {
@@ -249,6 +258,7 @@ function downloadAttachment(index: string | number) {
         <div v-for="email in emails" :key="email.id" class="email-item" :class="{ 'email-unread': !email.isRead }" @click="openDetail(email.id)">
           <div class="flex-y-center justify-between">
             <div class="flex-y-center gap-8px">
+              <span class="star-btn" :class="{ starred: email.starred }" @click="e => toggleStar(email, e)">{{ email.starred ? '★' : '☆' }}</span>
               <span v-if="!email.isRead" class="w-8px h-8px rounded-full bg-#2080f0 inline-block" />
               <span class="font-medium" :class="{ 'font-600': !email.isRead }">{{ email.from?.split(',')[0] || '未知' }}</span>
             </div>
@@ -291,6 +301,7 @@ function downloadAttachment(index: string | number) {
       <template #footer>
         <NSpace justify="space-between">
           <NSpace>
+            <NButton @click="toggleStar(detailEmail!, $event)">{{ detailEmail?.starred ? '取消星标' : '加星标' }}</NButton>
             <NButton @click="toggleRead(detailEmail!)">{{ detailEmail?.isRead ? '标为未读' : '标为已读' }}</NButton>
             <NButton @click="reply">回复</NButton>
             <NButton @click="forward">转发</NButton>
@@ -321,4 +332,10 @@ html.dark .email-content { border-color: #333; }
   display: flex; align-items: center; justify-content: space-between;
   padding: 8px 12px; border: 1px solid #efefef; border-radius: 4px; margin-bottom: 8px;
 }
+.star-btn {
+  cursor: pointer; font-size: 18px; line-height: 1; color: #d9d9d9; user-select: none;
+  transition: color 0.2s, transform 0.2s;
+}
+.star-btn:hover { transform: scale(1.2); }
+.star-btn.starred { color: #f5a623; }
 </style>

@@ -195,7 +195,7 @@ export class InboxService {
     if (existing) return;
 
     await this.env.DB.prepare(
-      `INSERT INTO inbox_emails (id, account_id, user_id, uid, folder, sender, recipient, cc, subject, html, text, attachments, flags, internal_date, is_read, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO inbox_emails (id, account_id, user_id, uid, folder, sender, recipient, cc, subject, html, text, attachments, flags, internal_date, is_read, starred, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       id, accountId, this.userId, email.uid, folder,
       email.from?.join(', ') || '',
@@ -215,7 +215,7 @@ export class InboxService {
   /** 获取某封邮件的完整内容（按需拉取，连接 IMAP 获取正文） */
   async fetchEmailContent(id: string): Promise<InboxEmail | null> {
     const row = await this.env.DB.prepare(
-      'SELECT id, account_id, user_id, uid, folder, sender, recipient, cc, subject, html, text, attachments, flags, internal_date, is_read, created_at FROM inbox_emails WHERE id = ? AND user_id = ?'
+      'SELECT id, account_id, user_id, uid, folder, sender, recipient, cc, subject, html, text, attachments, flags, internal_date, is_read, starred, created_at FROM inbox_emails WHERE id = ? AND user_id = ?'
     ).bind(id, this.userId).first<any>();
     if (!row) return null;
 
@@ -279,7 +279,7 @@ export class InboxService {
     if (search) { clauses.push('(subject LIKE ? OR sender LIKE ? OR recipient LIKE ?)'); const s = `%${search}%`; params.push(s, s, s); }
     const where = clauses.join(' AND ');
     const { total } = await this.env.DB.prepare(`SELECT COUNT(*) as total FROM inbox_emails WHERE ${where}`).bind(...params).first<any>();
-    const { results } = await this.env.DB.prepare(`SELECT id, account_id, user_id, uid, folder, sender, recipient, cc, subject, html, text, attachments, flags, internal_date, is_read, created_at FROM inbox_emails WHERE ${where} ORDER BY internal_date DESC LIMIT ? OFFSET ?`).bind(...params, pageSize, offset).all<any>();
+    const { results } = await this.env.DB.prepare(`SELECT id, account_id, user_id, uid, folder, sender, recipient, cc, subject, html, text, attachments, flags, internal_date, is_read, starred, created_at FROM inbox_emails WHERE ${where} ORDER BY internal_date DESC LIMIT ? OFFSET ?`).bind(...params, pageSize, offset).all<any>();
     return {
       emails: results.map(r => this.mapEmail(r)),
       total: total || 0
@@ -293,6 +293,7 @@ export class InboxService {
       userId: r.user_id,
       uid: r.uid,
       folder: r.folder,
+      starred: !!r.starred,
       from: r.sender,
       to: r.recipient,
       cc: r.cc,
@@ -309,7 +310,7 @@ export class InboxService {
 
   async getEmail(id: string): Promise<InboxEmail | null> {
     const row = await this.env.DB.prepare(
-      'SELECT id, account_id, user_id, uid, folder, sender, recipient, cc, subject, html, text, attachments, flags, internal_date, is_read, created_at FROM inbox_emails WHERE id = ? AND user_id = ?'
+      'SELECT id, account_id, user_id, uid, folder, sender, recipient, cc, subject, html, text, attachments, flags, internal_date, is_read, starred, created_at FROM inbox_emails WHERE id = ? AND user_id = ?'
     ).bind(id, this.userId).first<any>();
     if (!row) return null;
     return this.mapEmail(row);
@@ -348,7 +349,14 @@ export class InboxService {
     }
   }
 
-  /** 搜索邮件 */
+  /** 星标/取消星标 */
+  async toggleStar(id: string): Promise<boolean> {
+    const row = await this.env.DB.prepare('SELECT starred FROM inbox_emails WHERE id = ? AND user_id = ?').bind(id, this.userId).first<any>();
+    if (!row) throw new Error('邮件不存在');
+    const newVal = row.starred ? 0 : 1;
+    await this.env.DB.prepare('UPDATE inbox_emails SET starred = ? WHERE id = ?').bind(newVal, id).run();
+    return !!newVal;
+  }
   async searchEmails(accountId: string, query: string, page: number = 1, pageSize: number = 20): Promise<{ emails: InboxEmail[]; total: number }> {
     return this.listEmails(accountId, 'ALL', page, pageSize, query);
   }

@@ -6,6 +6,7 @@ export interface InboxEmail {
   accountId: string;
   uid: number;
   folder?: string;
+  starred?: boolean;
   from: string;
   to: string;
   cc?: string;
@@ -64,6 +65,11 @@ export function markInboxEmailRead(id: string) {
 // 标记未读
 export function markInboxEmailUnread(id: string) {
   return request<{ success: boolean }>({ url: `/inbox/email/${id}/unread`, method: 'post' });
+}
+
+// 星标/取消星标
+export function toggleInboxStar(id: string) {
+  return request<{ starred: boolean }>({ url: `/inbox/email/${id}/star`, method: 'post' });
 }
 
 // 搜索

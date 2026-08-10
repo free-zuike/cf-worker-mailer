@@ -90,6 +90,7 @@ export async function initDatabase(env: Env) {
             flags TEXT,
             internal_date TEXT,
             is_read INTEGER DEFAULT 0,
+            starred INTEGER DEFAULT 0,
             created_at TEXT NOT NULL,
             UNIQUE(account_id, uid)
           )
@@ -98,6 +99,10 @@ export async function initDatabase(env: Env) {
         // 迁移：添加 folder 字段
         try {
           await env.DB.prepare("ALTER TABLE inbox_emails ADD COLUMN folder TEXT DEFAULT 'INBOX'").run();
+        } catch {}
+        // 迁移：添加 starred 字段
+        try {
+          await env.DB.prepare("ALTER TABLE inbox_emails ADD COLUMN starred INTEGER DEFAULT 0").run();
         } catch {}
       }
       // 检查 contacts 表
@@ -260,6 +265,7 @@ export async function initDatabase(env: Env) {
         html TEXT, text TEXT, attachments TEXT, flags TEXT,
         internal_date TEXT,
         is_read INTEGER DEFAULT 0,
+        starred INTEGER DEFAULT 0,
         created_at TEXT NOT NULL,
         UNIQUE(account_id, uid)
       )

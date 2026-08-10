@@ -240,6 +240,7 @@ export interface InboxEmail {
   userId: string;
   uid: number;
   folder?: string;
+  starred?: boolean;
   from: string;
   to: string;
   cc?: string;

@@ -78,6 +78,13 @@ inbox.post('/email/:id/unread', async (c) => {
   return c.json({ success: true });
 });
 
+// 星标/取消星标
+inbox.post('/email/:id/star', async (c) => {
+  const svc = new InboxService(c.env, c.get('user').id);
+  const starred = await svc.toggleStar(c.req.param('id'));
+  return c.json({ starred });
+});
+
 // 搜索邮件（支持文件夹筛选）
 inbox.get('/search/:configId', async (c) => {
   const svc = new InboxService(c.env, c.get('user').id);
