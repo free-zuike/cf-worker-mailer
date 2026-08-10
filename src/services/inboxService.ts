@@ -195,7 +195,7 @@ export class InboxService {
     if (existing) return;
 
     await this.env.DB.prepare(
-      `INSERT INTO inbox_emails (id, account_id, user_id, uid, folder, sender, recipient, cc, subject, html, text, attachments, flags, internal_date, is_read, starred, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO inbox_emails (id, account_id, user_id, uid, folder, sender, recipient, cc, subject, html, text, attachments, flags, internal_date, is_read, starred, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       id, accountId, this.userId, email.uid, folder,
       email.from?.join(', ') || '',
@@ -208,6 +208,7 @@ export class InboxService {
       JSON.stringify(email.flags || []),
       email.internalDate ? new Date(email.internalDate).toISOString() : now,
       (email.flags || []).includes('Seen') ? 1 : 0,
+      0,
       now
     ).run();
   }
