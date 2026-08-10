@@ -57,6 +57,10 @@ export function setupElegantRouter() {
       if (menuConfig[key]) {
         meta.order = menuConfig[key].order;
         meta.icon = menuConfig[key].icon;
+        // 在 menuConfig 中的路由默认显示在菜单
+        if (key === 'api-keys') {
+          meta.hideInMenu = false;
+        }
       }
 
       // 使用富文本编辑器的页面，禁止缓存避免空白页

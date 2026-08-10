@@ -46,9 +46,9 @@ export const generatedRoutes: GeneratedRoute[] = [
     meta: {
       title: 'api-keys',
       i18nKey: 'route.api-keys',
-      hideInMenu: true,
       order: 10,
-      icon: 'mdi:key-variant'
+      icon: 'mdi:key-variant',
+      hideInMenu: false
     }
   },
   {
@@ -70,7 +70,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     meta: {
       title: 'contacts',
       i18nKey: 'route.contacts',
-      order: 8,
+      order: 9,
       icon: 'mdi:book-account-outline'
     }
   },
@@ -81,7 +81,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     meta: {
       title: 'global-variables',
       i18nKey: 'route.global-variables',
-      order: 7,
+      order: 8,
       icon: 'mdi:variable'
     }
   },
@@ -92,7 +92,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     meta: {
       title: 'history',
       i18nKey: 'route.history',
-      order: 5,
+      order: 6,
       icon: 'mdi:history'
     }
   },
@@ -158,7 +158,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     meta: {
       title: 'settings',
       i18nKey: 'route.settings',
-      order: 6,
+      order: 7,
       icon: 'mdi:cog-outline'
     }
   },
@@ -169,7 +169,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     meta: {
       title: 'smtp',
       i18nKey: 'route.smtp',
-      order: 3,
+      order: 4,
       icon: 'mdi:server'
     }
   },
@@ -191,7 +191,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     meta: {
       title: 'templates',
       i18nKey: 'route.templates',
-      order: 4,
+      order: 5,
       icon: 'mdi:file-document-outline'
     }
   }
