@@ -186,10 +186,6 @@ onMounted(loadConfigs);
         <NFormItem label="发件人名">
           <NInput v-model:value="form.fromName" placeholder="发件人名称" />
         </NFormItem>
-        <NSpace>
-          <NButton type="primary" @click="handleSave">保存</NButton>
-          <NButton @click="showModal = false">取消</NButton>
-        </NSpace>
       </NForm>
 
       <NDivider />
@@ -208,6 +204,11 @@ onMounted(loadConfigs);
           <NInput v-model:value="form.imapPassword" type="password" placeholder="留空则使用 SMTP 的授权码" />
         </NFormItem>
       </NForm>
+
+      <NSpace justify="end" class="mt-16px">
+        <NButton @click="showModal = false">取消</NButton>
+        <NButton type="primary" @click="handleSave">保存</NButton>
+      </NSpace>
     </NModal>
   </NSpace>
 </template>

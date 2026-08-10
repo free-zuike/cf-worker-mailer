@@ -17,8 +17,13 @@ inbox.get('/configs', async (c) => {
 // 同步某个 SMTP 配置的收件箱
 inbox.post('/sync/:configId', async (c) => {
   const svc = new InboxService(c.env, c.get('user').id);
-  const result = await svc.syncByConfigId(c.req.param('configId'));
-  return c.json(result);
+  try {
+    const result = await svc.syncByConfigId(c.req.param('configId'));
+    return c.json(result);
+  } catch (error) {
+    console.error('Sync inbox error:', error);
+    return c.json({ error: (error as Error).message || '同步失败，请检查 IMAP 配置和授权码' }, 500);
+  }
 });
 
 // 列出邮件
