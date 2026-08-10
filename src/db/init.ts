@@ -122,6 +122,23 @@ export async function initDatabase(env: Env) {
           )
         `).run();
       }
+      // 检查 api_keys 表
+      const apiKeysTable = await env.DB.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='api_keys'"
+      ).first();
+      if (!apiKeysTable) {
+        console.log('Creating api_keys table...');
+        await env.DB.prepare(`
+          CREATE TABLE api_keys (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            key_hash TEXT NOT NULL,
+            expires_at INTEGER,
+            created_at TEXT NOT NULL
+          )
+        `).run();
+      }
       // 迁移：为 smtp_configs 添加 IMAP 字段
       try {
         await env.DB.prepare("ALTER TABLE smtp_configs ADD COLUMN imap_host TEXT").run();
@@ -268,6 +285,17 @@ export async function initDatabase(env: Env) {
         starred INTEGER DEFAULT 0,
         created_at TEXT NOT NULL,
         UNIQUE(account_id, uid)
+      )
+    `).run();
+
+    await env.DB.prepare(`
+      CREATE TABLE api_keys (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        key_hash TEXT NOT NULL,
+        expires_at INTEGER,
+        created_at TEXT NOT NULL
       )
     `).run();
 

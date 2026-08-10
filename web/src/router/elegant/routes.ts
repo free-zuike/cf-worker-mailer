@@ -40,6 +40,16 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
+    name: 'api-keys',
+    path: '/api-keys',
+    component: 'layout.base$view.api-keys',
+    meta: {
+      title: 'api-keys',
+      i18nKey: 'route.api-keys',
+      hideInMenu: true
+    }
+  },
+  {
     name: 'compose',
     path: '/compose',
     component: 'layout.base$view.compose',

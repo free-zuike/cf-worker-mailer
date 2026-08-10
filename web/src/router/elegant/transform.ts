@@ -166,6 +166,7 @@ const routeMap: RouteMap = {
   "403": "/403",
   "404": "/404",
   "500": "/500",
+  "api-keys": "/api-keys",
   "compose": "/compose",
   "contacts": "/contacts",
   "global-variables": "/global-variables",

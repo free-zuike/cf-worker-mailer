@@ -235,6 +235,7 @@ const local: App.I18n.Schema = {
     'global-variables': '全局变量',
     contacts: '联系人',
     inbox: '收件箱',
+    'api-keys': 'API Key',
     'oauth-callback': 'OAuth 回调'
   },
   page: {

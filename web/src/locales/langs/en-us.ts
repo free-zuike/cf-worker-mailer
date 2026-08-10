@@ -239,6 +239,7 @@ const local: App.I18n.Schema = {
     'global-variables': 'Global Variables',
     contacts: 'Contacts',
     inbox: 'Inbox',
+    'api-keys': 'API Keys',
     'oauth-callback': 'OAuth Callback'
   },
   page: {

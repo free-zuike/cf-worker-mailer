@@ -26,7 +26,7 @@ export function setupElegantRouter() {
 
       const constantRoutes: RouteKey[] = ['login', '403', '404', '500'];
 
-      const hideInMenuRoutes: RouteKey[] = ['login', '403', '404', '500', 'template-edit', 'oauth-callback', 'iframe-page'];
+      const hideInMenuRoutes: RouteKey[] = ['login', '403', '404', '500', 'template-edit', 'oauth-callback', 'iframe-page', 'api-keys'];
 
       const menuConfig: Record<string, { order: number; icon: string }> = {
         home: { order: 1, icon: 'mdi:monitor-dashboard' },

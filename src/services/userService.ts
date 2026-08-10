@@ -336,13 +336,55 @@ export class UserService {
     };
   }
 
-  // 生成并存储 API Key
-  async generateApiKey(userId: string): Promise<string> {
+  // ---------- API Key 管理 ----------
+
+  // 生成 API Key（支持名称和有效期）
+  async generateApiKey(userId: string, name: string = 'default', expiresInDays?: number): Promise<{ id: string; key: string; expiresAt: string | null }> {
     const { key, hash } = await generateApiKey();
+    const id = crypto.randomUUID();
     const now = new Date().toISOString();
+    const expiresAt = expiresInDays ? Date.now() + expiresInDays * 86400_000 : null;
     await this.env.DB.prepare(
-      'UPDATE users SET api_key_hash = ?, updated_at = ? WHERE id = ?'
-    ).bind(hash, now, userId).run();
-    return key;
+      'INSERT INTO api_keys (id, user_id, name, key_hash, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(id, userId, name, hash, expiresAt, now).run();
+    return { id, key, expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null };
   }
+
+  // 列出所有 API Key
+  async listApiKeys(userId: string): Promise<{ id: string; name: string; expiresAt: string | null; createdAt: string }[]> {
+    const { results } = await this.env.DB.prepare(
+      'SELECT id, name, expires_at, created_at FROM api_keys WHERE user_id = ? ORDER BY created_at DESC'
+    ).bind(userId).all<{ id: string; name: string; expires_at: number | null; created_at: string }>();
+    return results.map(r => ({
+      id: r.id,
+      name: r.name,
+      expiresAt: r.expires_at ? new Date(r.expires_at).toISOString() : null,
+      createdAt: r.created_at
+    }));
+  }
+
+  // 删除 API Key
+  async deleteApiKey(userId: string, keyId: string): Promise<void> {
+    await this.env.DB.prepare('DELETE FROM api_keys WHERE id = ? AND user_id = ?').bind(keyId, userId).run();
+  }
+
+  // 通过 API Key 获取用户（同时检查有效期）
+  async getUserByApiKey(key: string): Promise<{ id: string } | null> {
+    const hash = await hashApiKey(key);
+    const row = await this.env.DB.prepare(
+      'SELECT id, expires_at FROM api_keys WHERE key_hash = ?'
+    ).bind(hash).first<{ id: string; expires_at: number | null }>();
+    if (!row) return null;
+    if (row.expires_at && Date.now() > row.expires_at) return null;
+    return { id: row.id };
+  }
+}
+
+// 哈希 API Key 的辅助函数
+async function hashApiKey(key: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(key);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }

@@ -25,12 +25,29 @@ misc.get('/metrics', async (c) => {
   return c.json({ metrics });
 });
 
-// API Key
+// API Key 管理
 misc.post('/api-key/generate', async (c) => {
   const user = c.get('user');
+  const { name, expiresInDays } = await c.req.json().catch(() => ({}));
   const userService = new UserService(c.env);
-  const apiKey = await userService.generateApiKey(user.id);
-  return c.json({ apiKey });
+  const result = await userService.generateApiKey(user.id, String(name || 'default'), expiresInDays ? Number(expiresInDays) : undefined);
+  return c.json(result, 201);
+});
+
+// 列出 API Key
+misc.get('/api-keys', async (c) => {
+  const user = c.get('user');
+  const userService = new UserService(c.env);
+  const keys = await userService.listApiKeys(user.id);
+  return c.json({ keys });
+});
+
+// 删除 API Key
+misc.delete('/api-key/:id', async (c) => {
+  const user = c.get('user');
+  const userService = new UserService(c.env);
+  await userService.deleteApiKey(user.id, c.req.param('id'));
+  return c.json({ success: true });
 });
 
 export default misc;

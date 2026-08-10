@@ -4,19 +4,18 @@ import { EmailService } from '../services/emailService';
 import { InboxService } from '../services/inboxService';
 import { TemplateService } from '../services/templateService';
 import { SmtpService } from '../services/smtpService';
+import { UserService } from '../services/userService';
 
 /**
  * MCP (Model Context Protocol) Server - 让 AI 模型能调用邮件服务
  * 通过 HTTP + JSON-RPC 实现，暴露 tools/list 和 tools/call
  */
 
-// 从 API Key 获取用户（简化：通过 API key 查询用户）
+// 从 API Key 获取用户（检查有效期）
 async function getUserByApiKey(env: Env, apiKey: string): Promise<{ id: string } | null> {
   if (!apiKey) return null;
-  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(apiKey));
-  const hashHex = Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2, '0')).join('');
-  const row = await env.DB.prepare('SELECT id FROM users WHERE api_key_hash = ?').bind(hashHex).first<any>();
-  return row ? { id: row.id } : null;
+  const userService = new UserService(env);
+  return userService.getUserByApiKey(apiKey);
 }
 
 // 工具定义
