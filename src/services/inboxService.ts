@@ -30,11 +30,27 @@ export class InboxService {
       throw new Error('IMAP 用户名或密码为空，请在发件配置中检查 SMTP 密码和 IMAP 授权码');
     }
 
+    // 重试一次
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await this.doSync(configId, full, password);
+      } catch (e) {
+        console.error(`Sync attempt ${attempt + 1} failed:`, e);
+        if (attempt === 1) throw e;
+        // 第一次失败后等待 2 秒再重试
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    }
+    return { synced: 0, errors: 0 };
+  }
+
+  private async doSync(configId: string, full: any, password: string): Promise<{ synced: number; errors: number }> {
+
     const imap = new CFImap({
       host: full.config.imapHost,
       port: full.config.imapPort || 993,
       tls: full.config.imapUseTls !== false,
-      timeoutMs: 30000,
+      timeoutMs: 60000,
       auth: { username: full.config.username, password }
     });
 
