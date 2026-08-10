@@ -1,5 +1,5 @@
 <script setup lang="tsx">
-import { onMounted, ref, computed } from 'vue';
+import { onMounted, onUnmounted, ref, computed } from 'vue';
 import { useMessage } from 'naive-ui';
 import { useRouter } from 'vue-router';
 import { fetchInboxConfigs, fetchInboxEmails, fetchInboxEmailFull, deleteInboxEmail, syncInbox, fetchInboxFolders, type InboxEmail, type InboxFolder } from '@/service/api/inbox';
@@ -34,8 +34,35 @@ onMounted(async () => {
     activeId.value = configs.value[0].id;
     await loadFolders();
     await loadEmails();
+    // 进入页面时自动同步一次
+    autoSync();
   }
 });
+
+// 自动同步：每 2 分钟检查一次
+let syncTimer: ReturnType<typeof setInterval> | null = null;
+onMounted(() => {
+  syncTimer = setInterval(() => autoSync(), 120_000);
+});
+onUnmounted(() => {
+  if (syncTimer) clearInterval(syncTimer);
+});
+
+async function autoSync() {
+  if (!activeId.value || syncing.value) return;
+  syncing.value = true;
+  const { error } = await syncInbox(activeId.value);
+  if (!error) {
+    // 延迟后刷新
+    setTimeout(async () => {
+      await loadFolders();
+      await loadEmails();
+      syncing.value = false;
+    }, 5000);
+  } else {
+    syncing.value = false;
+  }
+}
 
 async function loadFolders() {
   if (!activeId.value) return;
@@ -71,21 +98,8 @@ async function switchFolder(name: string) {
 }
 
 async function handleSync() {
-  if (!activeId.value) return;
-  syncing.value = true;
-  const { error } = await syncInbox(activeId.value);
-  if (!error) {
-    message.success('同步任务已提交，正在后台处理...');
-    setTimeout(async () => {
-      await loadFolders();
-      await loadEmails();
-      syncing.value = false;
-      message.success('同步完成');
-    }, 5000);
-  } else {
-    message.error('同步提交失败');
-    syncing.value = false;
-  }
+  message.success('同步任务已提交，正在后台处理...');
+  await autoSync();
 }
 
 async function openDetail(id: string) {
