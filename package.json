@@ -15,7 +15,6 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.0",
     "cf-imap": "^1.0.0",
     "hono": "^4.6.0",
     "pinia": "^3.0.4",
