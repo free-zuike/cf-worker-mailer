@@ -7,11 +7,14 @@ import { SmtpService } from '../services/smtpService';
 import { UserService } from '../services/userService';
 
 /**
- * MCP (Model Context Protocol) Server - 让 AI 模型能调用邮件服务
- * 协议版本: 2026-07-28 (stateless, per-request _meta)
+ * MCP (Model Context Protocol) Server
+ * 支持协议:
+ *   - 2025-11-25 (SDK ≤1.30 客户端, 带 initialize 握手)
+ *   - 2026-07-28 (stateless, per-request _meta)
  */
 
-const PROTOCOL_VERSION = '2026-07-28';
+const SUPPORTED_PROTOCOL_VERSIONS = ['2026-07-28', '2025-11-25'];
+const DEFAULT_PROTOCOL_VERSION = '2025-11-25';
 
 const SERVER_INFO = {
   name: 'cf-worker-mailer-mcp',
@@ -98,7 +101,11 @@ const TOOLS = [
 
 const mcp = new Hono<{ Bindings: Env }>();
 
-// 处理 MCP JSON-RPC 请求（2026-07-28 无状态协议）
+// SDK 1.30 (Streamable HTTP) 客户端会尝试 GET 建立 SSE 流，
+// 返回 405 让客户端优雅降级（仅使用 POST 通信）
+mcp.get('/', (c) => c.text('Method Not Allowed', 405));
+
+// 处理 MCP JSON-RPC 请求
 mcp.post('/', async (c) => {
   const body = await c.req.json().catch(() => null);
   if (!body || typeof body !== 'object') {
@@ -107,42 +114,6 @@ mcp.post('/', async (c) => {
 
   const { method, id, params } = body as any;
   const meta = params?._meta || {};
-
-  // server/discover 是唯一个不需要前置版本协商的方法
-  if (method !== 'server/discover') {
-    const version = meta['io.modelcontextprotocol/protocolVersion'];
-    if (!version || typeof version !== 'string') {
-      return c.json({
-        jsonrpc: '2.0', id,
-        error: { code: -32602, message: 'Missing required _meta field: io.modelcontextprotocol/protocolVersion' },
-      });
-    }
-
-    // 验证 MCP-Protocol-Version HTTP 头部与请求体一致
-    const headerVersion = c.req.header('MCP-Protocol-Version');
-    if (headerVersion && headerVersion !== version) {
-      return c.json({
-        jsonrpc: '2.0', id,
-        error: {
-          code: -32020,
-          message: 'MCP-Protocol-Version header does not match request body',
-          data: { header: headerVersion, body: version },
-        },
-      });
-    }
-
-    // 验证协议版本是否被支持
-    if (version !== PROTOCOL_VERSION) {
-      return c.json({
-        jsonrpc: '2.0', id,
-        error: {
-          code: -32022,
-          message: 'Unsupported protocol version',
-          data: { supported: [PROTOCOL_VERSION], requested: version },
-        },
-      });
-    }
-  }
 
   // 认证：从 headers 读取 API Key
   const authHeader = c.req.header('Authorization') || '';
@@ -156,7 +127,7 @@ mcp.post('/', async (c) => {
     id,
   });
 
-  // JSON-RPC 协议错误（非工具执行错误）
+  // JSON-RPC 协议错误
   const respondError = (code: number, message: string) => c.json({ jsonrpc: '2.0', error: { code, message }, id });
 
   // 工具执行错误（含 isError 标记，供 LLM 自我纠正）
@@ -166,9 +137,36 @@ mcp.post('/', async (c) => {
   });
 
   switch (method) {
+    /**
+     * 旧协议握手（SDK ≤1.30 客户端）
+     * 客户端发送 initialize 后，服务器协商协议版本。
+     * 服务器返回的版本必须在客户端 SUPPORTED_PROTOCOL_VERSIONS 中，
+     * 否则客户端会抛错。
+     */
+    case 'initialize': {
+      const requestedVersion = params?.protocolVersion;
+      const negotiated = SUPPORTED_PROTOCOL_VERSIONS.includes(requestedVersion)
+        ? requestedVersion
+        : DEFAULT_PROTOCOL_VERSION;
+      return respond({
+        protocolVersion: negotiated,
+        capabilities: { tools: {} },
+        serverInfo: SERVER_INFO,
+        instructions: '邮件发送服务。支持发送邮件、管理收件箱、搜索邮件、管理模板和发件配置。',
+      });
+    }
+
+    // 旧协议通知（客户端初始化完成，无响应体）
+    case 'notifications/initialized':
+      return c.json({ jsonrpc: '2.0', result: null, id });
+
+    /**
+     * 新协议发现端点（2026-07-28）
+     * 客户端通过 server/discover 获取服务器支持的协议版本和能力。
+     */
     case 'server/discover':
       return respond({
-        supportedVersions: [PROTOCOL_VERSION],
+        supportedVersions: SUPPORTED_PROTOCOL_VERSIONS,
         capabilities: { tools: {} },
         instructions: '邮件发送服务。支持发送邮件、管理收件箱、搜索邮件、管理模板和发件配置。',
         ttlMs: 300000,
@@ -182,6 +180,22 @@ mcp.post('/', async (c) => {
       return user ? respond({ user }) : respondError(401, 'Unauthorized');
 
     case 'tools/call': {
+      // 2026-07-28 新协议校验：请求带 _meta 时验证协议版本
+      const declaredVersion = meta['io.modelcontextprotocol/protocolVersion'];
+      if (declaredVersion !== undefined) {
+        if (typeof declaredVersion !== 'string') {
+          return respondError(-32602, 'Invalid _meta.io.modelcontextprotocol/protocolVersion');
+        }
+        const headerVersion = c.req.header('MCP-Protocol-Version');
+        if (headerVersion && headerVersion !== declaredVersion) {
+          return respondError(-32020, 'MCP-Protocol-Version header does not match request body');
+        }
+        if (!SUPPORTED_PROTOCOL_VERSIONS.includes(declaredVersion)) {
+          return respondError(-32022, `Unsupported protocol version: ${declaredVersion}`);
+        }
+      }
+      // 无 _meta 的请求（旧协议客户端）→ 直接放行
+
       if (!user) return respondError(401, 'Unauthorized: 请提供有效的 API Key');
       const toolName = params?.name;
       const args = params?.arguments || {};

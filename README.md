@@ -255,9 +255,15 @@ npx wrangler deploy
 
 ## MCP Server（AI 模型调用）
 
-本服务实现了 **MCP (Model Context Protocol)** 协议（版本 `2026-07-28`），AI 模型（如 Claude、Cursor 等）可以通过 MCP 调用邮件服务。
+本服务实现了 **MCP (Model Context Protocol)** 协议，AI 模型（如 Claude、Cursor 等）可以通过 MCP 调用邮件服务。
 
-采用无状态（stateless）设计：每个请求通过 `_meta` 字段携带协议版本和客户端能力，无需 `initialize` 握手。支持 `server/discover` 进行版本协商。
+**双协议兼容：**
+| 协议版本 | 说明 |
+|---------|------|
+| `2025-11-25` | 兼容 SDK ≤1.30 的客户端，通过 `initialize` 握手协商版本 |
+| `2026-07-28` | 无状态（stateless）协议，每个请求通过 `_meta` 传递版本和能力 |
+
+服务器自动检测客户端使用的协议版本，两种客户端均能正常工作。
 
 ### 可用工具
 
@@ -295,9 +301,21 @@ curl -X POST https://zuike.cc.cd/api/api-key/generate \
 
 ### 请求示例
 
-以下示例展示了遵守 `2026-07-28` 协议的请求与响应格式：
+**旧协议初始化握手（SDK ≤1.30 客户端自动执行）：**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2025-11-25",
+    "capabilities": {},
+    "clientInfo": { "name": "mcp-client", "version": "1.0.0" }
+  }
+}
+```
 
-**发现服务器能力：**
+**新协议发现服务器能力（2026-07-28）：**
 ```json
 {
   "jsonrpc": "2.0",
@@ -307,7 +325,7 @@ curl -X POST https://zuike.cc.cd/api/api-key/generate \
 }
 ```
 
-**列出工具（需携带 `_meta` 协议版本）：**
+**列出工具（新协议需携带 `_meta`）：**
 ```json
 {
   "jsonrpc": "2.0",
@@ -322,7 +340,7 @@ curl -X POST https://zuike.cc.cd/api/api-key/generate \
 }
 ```
 
-**响应格式：**
+**响应格式（新旧协议一致）：**
 ```json
 {
   "jsonrpc": "2.0",
@@ -340,7 +358,7 @@ curl -X POST https://zuike.cc.cd/api/api-key/generate \
 }
 ```
 
-**调用工具：**
+**调用工具（旧协议：不带 `_meta`，新协议：带 `_meta`）：**
 ```json
 {
   "jsonrpc": "2.0",
@@ -348,11 +366,7 @@ curl -X POST https://zuike.cc.cd/api/api-key/generate \
   "method": "tools/call",
   "params": {
     "name": "list_smtp_configs",
-    "arguments": {},
-    "_meta": {
-      "io.modelcontextprotocol/protocolVersion": "2026-07-28",
-      "io.modelcontextprotocol/clientCapabilities": {}
-    }
+    "arguments": {}
   }
 }
 ```
