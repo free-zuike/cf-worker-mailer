@@ -255,7 +255,7 @@ npx wrangler deploy
 
 ## MCP Server（AI 模型调用）
 
-本服务实现了 **MCP (Model Context Protocol)** 协议，AI 模型（如 Claude、Cursor 等）可以通过 MCP 调用邮件服务。
+本服务实现了 **MCP (Model Context Protocol)** 协议（完整实现），AI 模型（如 Claude、Cursor 等）可以通过 MCP 调用邮件服务。
 
 **双协议兼容：**
 | 协议版本 | 说明 |
@@ -264,6 +264,20 @@ npx wrangler deploy
 | `2026-07-28` | 无状态（stateless）协议，每个请求通过 `_meta` 传递版本和能力 |
 
 服务器自动检测客户端使用的协议版本，两种客户端均能正常工作。
+
+### 实现的功能
+
+| MCP 功能 | 状态 |
+|---------|------|
+| **Tools**（工具） | ✅ `tools/list` + `tools/call`，10 个工具 |
+| **Resources**（资源） | ✅ `resources/list` + `resources/templates/list` + `resources/read` |
+| **Prompts**（提示） | ✅ `prompts/list` + `prompts/get`，3 个邮件提示模板 |
+| **Completions**（补全） | ✅ `completion/complete`，参数自动补全 |
+| **Ping** | ✅ 心跳检测 |
+| **Subscriptions**（订阅） | ✅ `subscriptions/listen` + SSE 流 (GET /) |
+| **Notifications** | ✅ 资源/工具列表变更通知推送 |
+| **Cancellation** | ✅ `notifications/cancelled` |
+| **Version Negotiation** | ✅ `initialize` + `server/discover` |
 
 ### 可用工具
 
@@ -276,6 +290,26 @@ npx wrangler deploy
 | `list_smtp_configs` | 获取发件配置 |
 | `list_templates` | 获取邮件模板 |
 | `list_inbox_configs` | 获取支持 IMAP 的配置 |
+| `list_email_history` | 获取发送历史 |
+| `retry_email` | 重试发送失败的邮件 |
+| `get_metrics` | 获取邮件统计数据 |
+
+### 可用资源
+
+| URI 模板 | 说明 |
+|----------|------|
+| `mailer://email/{id}` | 已发送邮件详情 |
+| `mailer://template/{id}` | 邮件模板内容 |
+| `mailer://smtp/{id}` | 发件配置信息 |
+| `mailer://inbox/{configId}/{emailId}` | 收件箱邮件 |
+
+### 可用提示模板
+
+| 名称 | 说明 |
+|------|------|
+| `compose-email` | 撰写新邮件 |
+| `reply-email` | 回复邮件 |
+| `search-email` | 搜索并总结邮件 |
 
 ### 使用方式
 

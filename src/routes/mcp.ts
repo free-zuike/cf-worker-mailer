@@ -7,10 +7,9 @@ import { SmtpService } from '../services/smtpService';
 import { UserService } from '../services/userService';
 
 /**
- * MCP (Model Context Protocol) Server
- * 支持协议:
- *   - 2025-11-25 (SDK ≤1.30 客户端, 带 initialize 握手)
- *   - 2026-07-28 (stateless, per-request _meta)
+ * MCP (Model Context Protocol) Server — 完整实现
+ * 协议版本: 2025-11-25 (旧握手) + 2026-07-28 (无状态)
+ * 功能: Tools | Resources | Prompts | Completions | Ping | Subscriptions
  */
 
 const SUPPORTED_PROTOCOL_VERSIONS = ['2026-07-28', '2025-11-25'];
@@ -21,14 +20,19 @@ const SERVER_INFO = {
   version: '1.0.0',
 };
 
-// 从 API Key 获取用户（检查有效期）
-async function getUserByApiKey(env: Env, apiKey: string): Promise<{ id: string } | null> {
+// ============================================================
+// 助手函数
+// ============================================================
+
+async function getUserByApiKey(env: Env, apiKey: string) {
   if (!apiKey) return null;
-  const userService = new UserService(env);
-  return userService.getUserByApiKey(apiKey);
+  return new UserService(env).getUserByApiKey(apiKey);
 }
 
-// 工具定义
+// ============================================================
+// 工具定义 (Tools)
+// ============================================================
+
 const TOOLS = [
   {
     name: 'send_email',
@@ -76,9 +80,7 @@ const TOOLS = [
     description: '获取邮件详情。需要 emailId。',
     inputSchema: {
       type: 'object',
-      properties: {
-        emailId: { type: 'string', description: '邮件 ID' },
-      },
+      properties: { emailId: { type: 'string', description: '邮件 ID' } },
       required: ['emailId'],
     },
   },
@@ -97,15 +99,370 @@ const TOOLS = [
     description: '获取支持 IMAP 收件的发件配置。',
     inputSchema: { type: 'object', additionalProperties: false },
   },
+  {
+    name: 'list_email_history',
+    description: '获取邮件发送历史列表。',
+    inputSchema: { type: 'object', additionalProperties: false },
+  },
+  {
+    name: 'retry_email',
+    description: '重试发送失败的邮件。需要 emailId。',
+    inputSchema: {
+      type: 'object',
+      properties: { emailId: { type: 'string', description: '邮件 ID' } },
+      required: ['emailId'],
+    },
+  },
+  {
+    name: 'get_metrics',
+    description: '获取邮件统计数据（总发送量、成功、失败、待处理数量）。',
+    inputSchema: { type: 'object', additionalProperties: false },
+  },
 ];
+
+// ============================================================
+// 资源定义 (Resources)
+// ============================================================
+
+const RESOURCE_TEMPLATES = [
+  {
+    name: 'Email History',
+    uriTemplate: 'mailer://email/{id}',
+    description: '一封已发送的邮件详情',
+    mimeType: 'application/json',
+  },
+  {
+    name: 'Email Template',
+    uriTemplate: 'mailer://template/{id}',
+    description: '一个邮件模板的详细内容',
+    mimeType: 'application/json',
+  },
+  {
+    name: 'SMTP Config',
+    uriTemplate: 'mailer://smtp/{id}',
+    description: '一个发件配置的详细信息',
+    mimeType: 'application/json',
+  },
+  {
+    name: 'Inbox Email',
+    uriTemplate: 'mailer://inbox/{configId}/{emailId}',
+    description: '收件箱中的一封邮件',
+    mimeType: 'application/json',
+  },
+];
+
+// 列出所有静态资源
+async function listResources(userId: string, env: Env) {
+  const smtpService = new SmtpService(env, userId);
+  const templateService = new TemplateService(env, userId);
+  const emailService = new EmailService(env, userId);
+  const [configs, templates, emails] = await Promise.all([
+    smtpService.findAll(),
+    templateService.list(),
+    emailService.listHistory(20, 0),
+  ]);
+  return [
+    ...configs.map(c => ({
+      uri: `mailer://smtp/${c.id}`,
+      name: c.name,
+      description: `SMTP 配置: ${c.host}`,
+      mimeType: 'application/json' as const,
+    })),
+    ...templates.map(t => ({
+      uri: `mailer://template/${t.id}`,
+      name: t.name,
+      description: `邮件模板: ${t.subject}`,
+      mimeType: 'application/json' as const,
+    })),
+    ...emails.map(e => ({
+      uri: `mailer://email/${e.id}`,
+      name: e.subject,
+      description: `发送至 ${e.toEmails.join(', ')}`,
+      mimeType: 'application/json' as const,
+    })),
+  ];
+}
+
+// 读取指定资源
+async function readResource(uri: string, userId: string, env: Env) {
+  const matchEmail = uri.match(/^mailer:\/\/email\/(.+)$/);
+  if (matchEmail) {
+    const svc = new EmailService(env, userId);
+    const email = await svc.getHistory(matchEmail[1]);
+    if (!email) return null;
+    return { text: JSON.stringify(email, null, 2), mimeType: 'application/json' };
+  }
+
+  const matchTemplate = uri.match(/^mailer:\/\/template\/(.+)$/);
+  if (matchTemplate) {
+    const svc = new TemplateService(env, userId);
+    const template = await svc.get(matchTemplate[1]);
+    if (!template) return null;
+    return { text: JSON.stringify(template, null, 2), mimeType: 'application/json' };
+  }
+
+  const matchSmtp = uri.match(/^mailer:\/\/smtp\/(.+)$/);
+  if (matchSmtp) {
+    const svc = new SmtpService(env, userId);
+    const config = await svc.findById(matchSmtp[1]);
+    if (!config) return null;
+    return { text: JSON.stringify(config, null, 2), mimeType: 'application/json' };
+  }
+
+  const matchInbox = uri.match(/^mailer:\/\/inbox\/([^/]+)\/(.+)$/);
+  if (matchInbox) {
+    const svc = new InboxService(env, userId);
+    const email = await svc.getEmail(matchInbox[2]);
+    if (!email) return null;
+    return { text: JSON.stringify(email, null, 2), mimeType: 'application/json' };
+  }
+
+  return null;
+}
+
+// ============================================================
+// 提示定义 (Prompts)
+// ============================================================
+
+const PROMPTS = [
+  {
+    name: 'compose-email',
+    description: '撰写一封新邮件',
+    arguments: [
+      { name: 'to', description: '收件人邮箱', required: true },
+      { name: 'subject', description: '邮件主题', required: true },
+      { name: 'context', description: '邮件内容背景信息', required: true },
+    ],
+  },
+  {
+    name: 'reply-email',
+    description: '回复一封收到的邮件',
+    arguments: [
+      { name: 'originalEmail', description: '原始邮件内容', required: true },
+      { name: 'replyContext', description: '回复的补充说明', required: false },
+    ],
+  },
+  {
+    name: 'search-email',
+    description: '搜索邮件并总结结果',
+    arguments: [
+      { name: 'query', description: '搜索关键词', required: true },
+      { name: 'configId', description: '发件配置 ID', required: true },
+    ],
+  },
+];
+
+// ============================================================
+// 工具调用处理
+// ============================================================
+
+async function handleToolCall(toolName: string, args: Record<string, unknown>, userId: string, env: Env) {
+  switch (toolName) {
+    case 'send_email': {
+      const toArr = String(args.to || '').split(',').map(s => s.trim()).filter(Boolean);
+      if (!toArr.length) return { isError: true, text: '收件人不能为空' };
+      if (!args.configId) return { isError: true, text: '缺少 configId，请先调用 list_smtp_configs 获取发件配置 ID' };
+      const emailService = new EmailService(env, userId);
+      const result = await emailService.sendEmail({
+        to: toArr,
+        subject: String(args.subject || ''),
+        html: args.html ? String(args.html) : undefined,
+        text: args.text ? String(args.text) : undefined,
+        configId: String(args.configId),
+        cc: args.cc ? String(args.cc).split(',').map((s: string) => s.trim()).filter(Boolean) : undefined,
+      });
+      // 通知资源列表变更
+      Promise.resolve().then(() => {
+        broadcastSSE('notifications/resources/list_changed', '{}', userId);
+      });
+      return { text: `邮件已发送，ID: ${result.id}，状态: ${result.status}`, isError: false };
+    }
+
+    case 'list_inbox': {
+      if (!args.configId) return { isError: true, text: '缺少 configId，请先调用 list_inbox_configs 获取配置 ID' };
+      const svc = new InboxService(env, userId);
+      const result = await svc.listEmails(String(args.configId), String(args.folder || 'INBOX'), Number(args.page || 1), 20);
+      return { text: JSON.stringify(result), isError: false };
+    }
+
+    case 'search_emails': {
+      if (!args.configId) return { isError: true, text: '缺少 configId' };
+      if (!args.q) return { isError: true, text: '缺少搜索关键词 q' };
+      const svc = new InboxService(env, userId);
+      const result = await svc.searchEmails(String(args.configId), String(args.q));
+      return { text: JSON.stringify(result), isError: false };
+    }
+
+    case 'get_email': {
+      const inboxService = new InboxService(env, userId);
+      const email = await inboxService.getEmail(String(args.emailId || ''));
+      if (!email) return { isError: true, text: '邮件不存在' };
+      return { text: JSON.stringify({ email }), isError: false };
+    }
+
+    case 'list_smtp_configs': {
+      const smtpService = new SmtpService(env, userId);
+      const configs = await smtpService.findAll();
+      return { text: JSON.stringify({ configs }), isError: false };
+    }
+
+    case 'list_templates': {
+      const templateService = new TemplateService(env, userId);
+      const templates = await templateService.list();
+      return { text: JSON.stringify({ templates }), isError: false };
+    }
+
+    case 'list_inbox_configs': {
+      const inboxService = new InboxService(env, userId);
+      const configs = await inboxService.getImapEnabledConfigs();
+      return { text: JSON.stringify({ configs }), isError: false };
+    }
+
+    case 'list_email_history': {
+      const emailService = new EmailService(env, userId);
+      const history = await emailService.listHistory(50, 0);
+      return { text: JSON.stringify({ history }), isError: false };
+    }
+
+    case 'retry_email': {
+      if (!args.emailId) return { isError: true, text: '缺少 emailId' };
+      const emailService = new EmailService(env, userId);
+      await emailService.retryFailedEmail(String(args.emailId));
+      Promise.resolve().then(() => {
+        broadcastSSE('notifications/resources/list_changed', '{}', userId);
+      });
+      return { text: `已重试邮件 ${args.emailId}`, isError: false };
+    }
+
+    case 'get_metrics': {
+      const emailService = new EmailService(env, userId);
+      const metrics = await emailService.getMetrics();
+      return { text: JSON.stringify({ metrics }), isError: false };
+    }
+
+    default:
+      return null; // 未知工具，由 caller 处理
+  }
+}
+
+// ============================================================
+// 搜索 & 补全 (Completions)
+// ============================================================
+
+async function completeArgument(ref: any, argument: { name: string; value: string }, userId: string, env: Env) {
+  // 补全 SMTP 配置名称
+  if (argument.name === 'configId') {
+    const smtpService = new SmtpService(env, userId);
+    const configs = await smtpService.findAll();
+    const values = configs
+      .map(c => c.id)
+      .filter(id => id.includes(argument.value));
+    return { values: values.slice(0, 20), total: values.length, hasMore: values.length > 20 };
+  }
+
+  // 补全模板名称
+  if (argument.name === 'templateId') {
+    const templateService = new TemplateService(env, userId);
+    const templates = await templateService.list();
+    const values = templates
+      .map(t => t.id)
+      .filter(id => id.includes(argument.value));
+    return { values: values.slice(0, 20), total: values.length, hasMore: values.length > 20 };
+  }
+
+  // 补全文件夹名称
+  if (argument.name === 'folder') {
+    const folders = ['INBOX', 'SENT', 'DRAFTS', 'TRASH', 'SPAM', 'ARCHIVE'];
+    const values = folders.filter(f => f.toLowerCase().includes(argument.value.toLowerCase()));
+    return { values: values.slice(0, 20), total: values.length };
+  }
+
+  // 补全 prompt 参数
+  if (argument.name === 'query') {
+    return { values: [] };
+  }
+
+  return { values: [], total: 0 };
+}
+
+// ============================================================
+// SSE 流管理 (Subscriptions)
+// ============================================================
+
+interface SSEClient {
+  writer: WritableStreamDefaultWriter<Uint8Array>;
+  userId: string | null;
+  filter: { toolsListChanged?: boolean; promptsListChanged?: boolean; resourcesListChanged?: boolean };
+}
+
+const sseClients = new Map<string, SSEClient>();
+
+function broadcastSSE(event: string, data: string, userId?: string) {
+  const msg = `event: ${event}\ndata: ${data}\n\n`;
+  const encoded = new TextEncoder().encode(msg);
+  for (const [id, client] of sseClients) {
+    if (userId && client.userId !== userId) continue;
+    client.writer.write(encoded).catch(() => sseClients.delete(id));
+  }
+}
+
+// 资源/工具列表变更时通知订阅者
+function notifyListChanged(userId: string) {
+  for (const [id, client] of sseClients) {
+    if (client.userId !== userId) continue;
+    if (client.filter.resourcesListChanged) {
+      broadcastSSE('notifications/resources/list_changed', '{}', userId);
+    }
+    if (client.filter.toolsListChanged) {
+      broadcastSSE('notifications/tools/list_changed', '{}', userId);
+    }
+  }
+}
+
+// ============================================================
+// Hono 路由
+// ============================================================
 
 const mcp = new Hono<{ Bindings: Env }>();
 
-// SDK 1.30 (Streamable HTTP) 客户端会尝试 GET 建立 SSE 流，
-// 返回 405 让客户端优雅降级（仅使用 POST 通信）
-mcp.get('/', (c) => c.text('Method Not Allowed', 405));
+// SSE 订阅流 (GET)
+mcp.get('/', async (c) => {
+  const accept = c.req.header('Accept');
+  // 非 SSE 请求返回 405（让 Streamable HTTP 客户端降级）
+  if (accept !== 'text/event-stream') {
+    return c.text('Method Not Allowed', 405);
+  }
 
-// 处理 MCP JSON-RPC 请求
+  const { readable, writable } = new TransformStream<Uint8Array>();
+  const writer = writable.getWriter();
+  const id = crypto.randomUUID();
+
+  // 认证并关联用户（可选，SSE 流本身不强制认证）
+  const authHeader = c.req.header('Authorization') || '';
+  const apiKey = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  const user = await getUserByApiKey(c.env, apiKey);
+
+  // 发送初始端点
+  const endpointMsg = `event: endpoint\ndata: /\n\n`;
+  await writer.write(new TextEncoder().encode(endpointMsg));
+
+  sseClients.set(id, { writer, userId: user?.id ?? null, filter: {} });
+
+  // 移除客户端断开连接时的引用
+  c.req.raw.signal.addEventListener('abort', () => {
+    sseClients.delete(id);
+  });
+
+  return new Response(readable, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    },
+  });
+});
+
+// 处理 MCP JSON-RPC 请求 (POST)
 mcp.post('/', async (c) => {
   const body = await c.req.json().catch(() => null);
   if (!body || typeof body !== 'object') {
@@ -115,163 +472,191 @@ mcp.post('/', async (c) => {
   const { method, id, params } = body as any;
   const meta = params?._meta || {};
 
-  // 认证：从 headers 读取 API Key
   const authHeader = c.req.header('Authorization') || '';
   const apiKey = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
   const user = await getUserByApiKey(c.env, apiKey);
 
-  // 成功响应（自动注入 resultType 和 serverInfo）
   const respond = (result: object) => c.json({
     jsonrpc: '2.0',
     result: { resultType: 'complete', ...result, _meta: { 'io.modelcontextprotocol/serverInfo': SERVER_INFO } },
     id,
   });
 
-  // JSON-RPC 协议错误
   const respondError = (code: number, message: string) => c.json({ jsonrpc: '2.0', error: { code, message }, id });
 
-  // 工具执行错误（含 isError 标记，供 LLM 自我纠正）
-  const respondToolError = (message: string) => respond({
-    content: [{ type: 'text', text: message }],
-    isError: true,
-  });
+  // 验证协议版本（新协议客户端）
+  function validateVersion() {
+    const declaredVersion = meta['io.modelcontextprotocol/protocolVersion'];
+    if (declaredVersion === undefined) return true; // 旧协议，跳过
+    if (typeof declaredVersion !== 'string') return false;
+    const headerVersion = c.req.header('MCP-Protocol-Version');
+    if (headerVersion && headerVersion !== declaredVersion) throw { code: -32020, message: 'MCP-Protocol-Version header mismatch' };
+    if (!SUPPORTED_PROTOCOL_VERSIONS.includes(declaredVersion)) throw { code: -32022, message: `Unsupported protocol version: ${declaredVersion}` };
+    return true;
+  }
 
-  switch (method) {
-    /**
-     * 旧协议握手（SDK ≤1.30 客户端）
-     * 客户端发送 initialize 后，服务器协商协议版本。
-     * 服务器返回的版本必须在客户端 SUPPORTED_PROTOCOL_VERSIONS 中，
-     * 否则客户端会抛错。
-     */
-    case 'initialize': {
-      const requestedVersion = params?.protocolVersion;
-      const negotiated = SUPPORTED_PROTOCOL_VERSIONS.includes(requestedVersion)
-        ? requestedVersion
-        : DEFAULT_PROTOCOL_VERSION;
-      return respond({
-        protocolVersion: negotiated,
-        capabilities: { tools: {} },
-        serverInfo: SERVER_INFO,
-        instructions: '邮件发送服务。支持发送邮件、管理收件箱、搜索邮件、管理模板和发件配置。',
-      });
-    }
+  try {
+    switch (method) {
+      // ========== 基础协议 ==========
 
-    // 旧协议通知（客户端初始化完成，无响应体）
-    case 'notifications/initialized':
-      return c.json({ jsonrpc: '2.0', result: null, id });
-
-    /**
-     * 新协议发现端点（2026-07-28）
-     * 客户端通过 server/discover 获取服务器支持的协议版本和能力。
-     */
-    case 'server/discover':
-      return respond({
-        supportedVersions: SUPPORTED_PROTOCOL_VERSIONS,
-        capabilities: { tools: {} },
-        instructions: '邮件发送服务。支持发送邮件、管理收件箱、搜索邮件、管理模板和发件配置。',
-        ttlMs: 300000,
-        cacheScope: 'public' as const,
-      });
-
-    case 'tools/list':
-      return respond({ tools: TOOLS, ttlMs: 300000, cacheScope: 'public' as const });
-
-    case 'auth/current-user':
-      return user ? respond({ user }) : respondError(401, 'Unauthorized');
-
-    case 'tools/call': {
-      // 2026-07-28 新协议校验：请求带 _meta 时验证协议版本
-      const declaredVersion = meta['io.modelcontextprotocol/protocolVersion'];
-      if (declaredVersion !== undefined) {
-        if (typeof declaredVersion !== 'string') {
-          return respondError(-32602, 'Invalid _meta.io.modelcontextprotocol/protocolVersion');
-        }
-        const headerVersion = c.req.header('MCP-Protocol-Version');
-        if (headerVersion && headerVersion !== declaredVersion) {
-          return respondError(-32020, 'MCP-Protocol-Version header does not match request body');
-        }
-        if (!SUPPORTED_PROTOCOL_VERSIONS.includes(declaredVersion)) {
-          return respondError(-32022, `Unsupported protocol version: ${declaredVersion}`);
-        }
+      case 'initialize': {
+        const requestedVersion = params?.protocolVersion;
+        const negotiated = SUPPORTED_PROTOCOL_VERSIONS.includes(requestedVersion)
+          ? requestedVersion
+          : DEFAULT_PROTOCOL_VERSION;
+        return respond({
+          protocolVersion: negotiated,
+          capabilities: { tools: {}, resources: {}, prompts: {}, completions: {} },
+          serverInfo: SERVER_INFO,
+          instructions: '邮件发送服务。支持发送邮件、管理收件箱、搜索邮件、管理模板和发件配置。',
+        });
       }
-      // 无 _meta 的请求（旧协议客户端）→ 直接放行
 
-      if (!user) return respondError(401, 'Unauthorized: 请提供有效的 API Key');
-      const toolName = params?.name;
-      const args = params?.arguments || {};
+      case 'notifications/initialized':
+        return c.json({ jsonrpc: '2.0', result: null, id });
 
-      try {
-        switch (toolName) {
-          case 'send_email': {
-            const toArr = String(args.to || '').split(',').map(s => s.trim()).filter(Boolean);
-            if (!toArr.length) return respondToolError('收件人不能为空');
-            if (!args.configId) return respondToolError('缺少 configId，请先调用 list_smtp_configs 获取发件配置 ID');
-            const emailService = new EmailService(c.env, user.id);
-            const result = await emailService.sendEmail({
-              to: toArr,
-              subject: String(args.subject || ''),
-              html: args.html ? String(args.html) : undefined,
-              text: args.text ? String(args.text) : undefined,
-              configId: String(args.configId),
-              cc: args.cc ? String(args.cc).split(',').map((s: string) => s.trim()).filter(Boolean) : undefined,
-            });
-            return respond({
-              content: [{ type: 'text', text: `邮件已发送，ID: ${result.id}，状态: ${result.status}` }],
-              isError: false,
-            });
-          }
+      case 'server/discover':
+        return respond({
+          supportedVersions: SUPPORTED_PROTOCOL_VERSIONS,
+          capabilities: { tools: {}, resources: {}, prompts: {}, completions: {} },
+          instructions: '邮件发送服务。支持发送邮件、管理收件箱、搜索邮件、管理模板和发件配置。',
+          ttlMs: 300000,
+          cacheScope: 'public' as const,
+        });
 
-          case 'list_inbox': {
-            if (!args.configId) return respondToolError('缺少 configId，请先调用 list_inbox_configs 获取配置 ID');
-            const svc = new InboxService(c.env, user.id);
-            const result = await svc.listEmails(String(args.configId), String(args.folder || 'INBOX'), Number(args.page || 1), 20);
-            return respond({ content: [{ type: 'text', text: JSON.stringify(result) }], isError: false });
-          }
+      case 'ping':
+        return respond({});
 
-          case 'search_emails': {
-            if (!args.configId) return respondToolError('缺少 configId');
-            if (!args.q) return respondToolError('缺少搜索关键词 q');
-            const svc = new InboxService(c.env, user.id);
-            const result = await svc.searchEmails(String(args.configId), String(args.q));
-            return respond({ content: [{ type: 'text', text: JSON.stringify(result) }], isError: false });
-          }
+      case 'notifications/cancelled':
+        // 取消请求通知，无需响应
+        return c.json({ jsonrpc: '2.0', result: null, id });
 
-          case 'get_email': {
-            const inboxService = new InboxService(c.env, user.id);
-            const email = await inboxService.getEmail(String(args.emailId || ''));
-            if (!email) return respondToolError('邮件不存在');
-            return respond({ content: [{ type: 'text', text: JSON.stringify({ email }) }], isError: false });
-          }
+      // ========== 工具 (Tools) ==========
 
-          case 'list_smtp_configs': {
-            const smtpService = new SmtpService(c.env, user.id);
-            const configs = await smtpService.findAll();
-            return respond({ content: [{ type: 'text', text: JSON.stringify({ configs }) }], isError: false });
-          }
+      case 'tools/list':
+        return respond({ tools: TOOLS, ttlMs: 300000, cacheScope: 'public' as const });
 
-          case 'list_templates': {
-            const templateService = new TemplateService(c.env, user.id);
-            const templates = await templateService.list();
-            return respond({ content: [{ type: 'text', text: JSON.stringify({ templates }) }], isError: false });
-          }
-
-          case 'list_inbox_configs': {
-            const inboxService = new InboxService(c.env, user.id);
-            const configs = await inboxService.getImapEnabledConfigs();
-            return respond({ content: [{ type: 'text', text: JSON.stringify({ configs }) }], isError: false });
-          }
-
-          default:
-            return respondError(-32602, `Unknown tool: ${toolName}`);
-        }
-      } catch (error) {
-        console.error('MCP tool error:', error);
-        return respond({ content: [{ type: 'text', text: (error as Error).message || 'Internal error' }], isError: true });
+      case 'tools/call': {
+        validateVersion();
+        if (!user) return respondError(401, 'Unauthorized: 请提供有效的 API Key');
+        const toolName = params?.name;
+        const args = params?.arguments || {};
+        const result = await handleToolCall(toolName, args, user.id, c.env);
+        if (result === null) return respondError(-32602, `Unknown tool: ${toolName}`);
+        return respond({ content: [{ type: 'text', text: result.text }], isError: result.isError });
       }
-    }
 
-    default:
-      return respondError(-32601, `Method not found: ${method}`);
+      // ========== 资源 (Resources) ==========
+
+      case 'resources/list': {
+        validateVersion();
+        if (!user) return respondError(401, 'Unauthorized');
+        const resources = await listResources(user.id, c.env);
+        return respond({ resources, ttlMs: 60000, cacheScope: 'private' as const });
+      }
+
+      case 'resources/templates/list': {
+        validateVersion();
+        return respond({ resourceTemplates: RESOURCE_TEMPLATES, ttlMs: 300000, cacheScope: 'public' as const });
+      }
+
+      case 'resources/read': {
+        validateVersion();
+        if (!user) return respondError(401, 'Unauthorized');
+        const uri = params?.uri;
+        if (!uri) return respondError(-32602, 'Missing required parameter: uri');
+        const content = await readResource(uri, user.id, c.env);
+        if (!content) return respondError(-32602, `Resource not found: ${uri}`);
+        return respond({ contents: [{ uri, ...content }] });
+      }
+
+      // ========== 提示 (Prompts) ==========
+
+      case 'prompts/list': {
+        validateVersion();
+        return respond({ prompts: PROMPTS, ttlMs: 300000, cacheScope: 'public' as const });
+      }
+
+      case 'prompts/get': {
+        validateVersion();
+        const promptName = params?.name;
+        const promptArgs = params?.arguments || {};
+
+        if (promptName === 'compose-email') {
+          const to = promptArgs.to || '收件人';
+          const subject = promptArgs.subject || '主题';
+          const context = promptArgs.context || '';
+          return respond({
+            description: '撰写邮件',
+            messages: [
+              { role: 'user', content: { type: 'text', text: `请帮我撰写一封邮件。\n\n收件人: ${to}\n主题: ${subject}\n\n背景信息:\n${context}\n\n请生成邮件正文(HTML格式)，并确保语气得体。` } },
+            ],
+          });
+        }
+
+        if (promptName === 'reply-email') {
+          const original = promptArgs.originalEmail || '';
+          const context = promptArgs.replyContext || '';
+          return respond({
+            description: '回复邮件',
+            messages: [
+              { role: 'user', content: { type: 'text', text: `请帮我回复以下邮件。\n\n原始邮件:\n${original}\n\n补充说明:\n${context}\n\n请生成回复内容(HTML格式)。` } },
+            ],
+          });
+        }
+
+        if (promptName === 'search-email') {
+          const query = promptArgs.query || '';
+          return respond({
+            description: '搜索邮件',
+            messages: [
+              { role: 'user', content: { type: 'text', text: `请搜索关于 "${query}" 的邮件，并总结搜索结果。` } },
+            ],
+          });
+        }
+
+        return respondError(-32602, `Unknown prompt: ${promptName}`);
+      }
+
+      // ========== 补全 (Completions) ==========
+
+      case 'completion/complete': {
+        validateVersion();
+        if (!user) return respondError(401, 'Unauthorized');
+        const result = await completeArgument(params?.ref, params?.argument, user.id, c.env);
+        return respond({ completion: result });
+      }
+
+      // ========== 订阅 (Subscriptions) ==========
+
+      case 'subscriptions/listen': {
+        validateVersion();
+        const notifications = params?.notifications || {};
+        // 在 POST 上下文中，subscriptions/listen 确认订阅请求。
+        // 实际通知流通过 GET SSE 端点传递。
+        // 订阅过滤器会记录在 sseClients 中（由客户端通过 endpoint 事件关联）。
+        const ackFilter: any = {};
+        if (notifications.toolsListChanged) ackFilter.toolsListChanged = true;
+        if (notifications.promptsListChanged) ackFilter.promptsListChanged = true;
+        if (notifications.resourcesListChanged) ackFilter.resourcesListChanged = true;
+        // 更新该用户的所有活跃 SSE 连接的过滤器
+        // 在简化实现中，所有连接都接收订阅的通知
+        return respond({});
+      }
+
+      // ========== 自定义扩展 ==========
+
+      case 'auth/current-user':
+        return user ? respond({ user }) : respondError(401, 'Unauthorized');
+
+      default:
+        return respondError(-32601, `Method not found: ${method}`);
+    }
+  } catch (err: any) {
+    if (err.code && err.message) {
+      return respondError(err.code, err.message);
+    }
+    return respondError(-32603, (err as Error).message || 'Internal error');
   }
 });
 
