@@ -8,8 +8,15 @@ import { UserService } from '../services/userService';
 
 /**
  * MCP (Model Context Protocol) Server - 让 AI 模型能调用邮件服务
- * 通过 HTTP + JSON-RPC 实现，暴露 tools/list 和 tools/call
+ * 协议版本: 2026-07-28 (stateless, per-request _meta)
  */
+
+const PROTOCOL_VERSION = '2026-07-28';
+
+const SERVER_INFO = {
+  name: 'cf-worker-mailer-mcp',
+  version: '1.0.0',
+};
 
 // 从 API Key 获取用户（检查有效期）
 async function getUserByApiKey(env: Env, apiKey: string): Promise<{ id: string } | null> {
@@ -31,10 +38,10 @@ const TOOLS = [
         subject: { type: 'string', description: '邮件主题' },
         html: { type: 'string', description: 'HTML 内容（可选，与 text 二选一）' },
         text: { type: 'string', description: '纯文本内容（可选，与 html 二选一）' },
-        cc: { type: 'string', description: '抄送，多个用逗号分隔（可选）' }
+        cc: { type: 'string', description: '抄送，多个用逗号分隔（可选）' },
       },
-      required: ['configId', 'to', 'subject']
-    }
+      required: ['configId', 'to', 'subject'],
+    },
   },
   {
     name: 'list_inbox',
@@ -44,10 +51,10 @@ const TOOLS = [
       properties: {
         configId: { type: 'string', description: '发件配置 ID' },
         folder: { type: 'string', description: '文件夹，默认 INBOX' },
-        page: { type: 'number', description: '页码，默认 1' }
+        page: { type: 'number', description: '页码，默认 1' },
       },
-      required: ['configId']
-    }
+      required: ['configId'],
+    },
   },
   {
     name: 'search_emails',
@@ -56,10 +63,10 @@ const TOOLS = [
       type: 'object',
       properties: {
         configId: { type: 'string', description: '发件配置 ID' },
-        q: { type: 'string', description: '搜索关键词（主题/发件人/收件人）' }
+        q: { type: 'string', description: '搜索关键词（主题/发件人/收件人）' },
       },
-      required: ['configId', 'q']
-    }
+      required: ['configId', 'q'],
+    },
   },
   {
     name: 'get_email',
@@ -67,31 +74,31 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
-        emailId: { type: 'string', description: '邮件 ID' }
+        emailId: { type: 'string', description: '邮件 ID' },
       },
-      required: ['emailId']
-    }
+      required: ['emailId'],
+    },
   },
   {
     name: 'list_smtp_configs',
     description: '获取发件配置列表。',
-    inputSchema: { type: 'object', properties: {} }
+    inputSchema: { type: 'object', additionalProperties: false },
   },
   {
     name: 'list_templates',
     description: '获取邮件模板列表。',
-    inputSchema: { type: 'object', properties: {} }
+    inputSchema: { type: 'object', additionalProperties: false },
   },
   {
     name: 'list_inbox_configs',
     description: '获取支持 IMAP 收件的发件配置。',
-    inputSchema: { type: 'object', properties: {} }
-  }
+    inputSchema: { type: 'object', additionalProperties: false },
+  },
 ];
 
 const mcp = new Hono<{ Bindings: Env }>();
 
-// 处理 MCP JSON-RPC 请求
+// 处理 MCP JSON-RPC 请求（2026-07-28 无状态协议）
 mcp.post('/', async (c) => {
   const body = await c.req.json().catch(() => null);
   if (!body || typeof body !== 'object') {
@@ -99,28 +106,77 @@ mcp.post('/', async (c) => {
   }
 
   const { method, id, params } = body as any;
+  const meta = params?._meta || {};
+
+  // server/discover 是唯一个不需要前置版本协商的方法
+  if (method !== 'server/discover') {
+    const version = meta['io.modelcontextprotocol/protocolVersion'];
+    if (!version || typeof version !== 'string') {
+      return c.json({
+        jsonrpc: '2.0', id,
+        error: { code: -32602, message: 'Missing required _meta field: io.modelcontextprotocol/protocolVersion' },
+      });
+    }
+
+    // 验证 MCP-Protocol-Version HTTP 头部与请求体一致
+    const headerVersion = c.req.header('MCP-Protocol-Version');
+    if (headerVersion && headerVersion !== version) {
+      return c.json({
+        jsonrpc: '2.0', id,
+        error: {
+          code: -32020,
+          message: 'MCP-Protocol-Version header does not match request body',
+          data: { header: headerVersion, body: version },
+        },
+      });
+    }
+
+    // 验证协议版本是否被支持
+    if (version !== PROTOCOL_VERSION) {
+      return c.json({
+        jsonrpc: '2.0', id,
+        error: {
+          code: -32022,
+          message: 'Unsupported protocol version',
+          data: { supported: [PROTOCOL_VERSION], requested: version },
+        },
+      });
+    }
+  }
 
   // 认证：从 headers 读取 API Key
   const authHeader = c.req.header('Authorization') || '';
   const apiKey = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
   const user = await getUserByApiKey(c.env, apiKey);
 
-  const respond = (result: any) => c.json({ jsonrpc: '2.0', result, id });
+  // 成功响应（自动注入 resultType 和 serverInfo）
+  const respond = (result: object) => c.json({
+    jsonrpc: '2.0',
+    result: { resultType: 'complete', ...result, _meta: { 'io.modelcontextprotocol/serverInfo': SERVER_INFO } },
+    id,
+  });
+
+  // JSON-RPC 协议错误（非工具执行错误）
   const respondError = (code: number, message: string) => c.json({ jsonrpc: '2.0', error: { code, message }, id });
 
+  // 工具执行错误（含 isError 标记，供 LLM 自我纠正）
+  const respondToolError = (message: string) => respond({
+    content: [{ type: 'text', text: message }],
+    isError: true,
+  });
+
   switch (method) {
-    case 'initialize':
+    case 'server/discover':
       return respond({
-        protocolVersion: '2025-03-26',
+        supportedVersions: [PROTOCOL_VERSION],
         capabilities: { tools: {} },
-        serverInfo: { name: 'cf-worker-mailer-mcp', version: '1.0.0' }
+        instructions: '邮件发送服务。支持发送邮件、管理收件箱、搜索邮件、管理模板和发件配置。',
+        ttlMs: 300000,
+        cacheScope: 'public' as const,
       });
 
-    case 'notifications/initialized':
-      return c.json({ jsonrpc: '2.0', result: null, id });
-
     case 'tools/list':
-      return respond({ tools: TOOLS });
+      return respond({ tools: TOOLS, ttlMs: 300000, cacheScope: 'public' as const });
 
     case 'auth/current-user':
       return user ? respond({ user }) : respondError(401, 'Unauthorized');
@@ -133,67 +189,70 @@ mcp.post('/', async (c) => {
       try {
         switch (toolName) {
           case 'send_email': {
-            const emailService = new EmailService(c.env, user.id);
             const toArr = String(args.to || '').split(',').map(s => s.trim()).filter(Boolean);
-            if (!toArr.length) return respondError(400, '收件人不能为空');
-            if (!args.configId) return respondError(400, '缺少 configId，请先调用 list_smtp_configs 获取发件配置 ID');
+            if (!toArr.length) return respondToolError('收件人不能为空');
+            if (!args.configId) return respondToolError('缺少 configId，请先调用 list_smtp_configs 获取发件配置 ID');
+            const emailService = new EmailService(c.env, user.id);
             const result = await emailService.sendEmail({
               to: toArr,
               subject: String(args.subject || ''),
               html: args.html ? String(args.html) : undefined,
               text: args.text ? String(args.text) : undefined,
               configId: String(args.configId),
-              cc: args.cc ? String(args.cc).split(',').map((s: string) => s.trim()).filter(Boolean) : undefined
+              cc: args.cc ? String(args.cc).split(',').map((s: string) => s.trim()).filter(Boolean) : undefined,
             });
-            return respond({ success: true, id: result.id, status: result.status, message: '邮件已发送' });
+            return respond({
+              content: [{ type: 'text', text: `邮件已发送，ID: ${result.id}，状态: ${result.status}` }],
+              isError: false,
+            });
           }
 
           case 'list_inbox': {
-            if (!args.configId) return respondError(400, '缺少 configId，请先调用 list_inbox_configs 获取配置 ID');
+            if (!args.configId) return respondToolError('缺少 configId，请先调用 list_inbox_configs 获取配置 ID');
             const svc = new InboxService(c.env, user.id);
             const result = await svc.listEmails(String(args.configId), String(args.folder || 'INBOX'), Number(args.page || 1), 20);
-            return respond(result);
+            return respond({ content: [{ type: 'text', text: JSON.stringify(result) }], isError: false });
           }
 
           case 'search_emails': {
-            if (!args.configId) return respondError(400, '缺少 configId');
-            if (!args.q) return respondError(400, '缺少搜索关键词 q');
+            if (!args.configId) return respondToolError('缺少 configId');
+            if (!args.q) return respondToolError('缺少搜索关键词 q');
             const svc = new InboxService(c.env, user.id);
             const result = await svc.searchEmails(String(args.configId), String(args.q));
-            return respond(result);
+            return respond({ content: [{ type: 'text', text: JSON.stringify(result) }], isError: false });
           }
 
           case 'get_email': {
             const inboxService = new InboxService(c.env, user.id);
             const email = await inboxService.getEmail(String(args.emailId || ''));
-            if (!email) return respondError(404, '邮件不存在');
-            return respond({ email });
+            if (!email) return respondToolError('邮件不存在');
+            return respond({ content: [{ type: 'text', text: JSON.stringify({ email }) }], isError: false });
           }
 
           case 'list_smtp_configs': {
             const smtpService = new SmtpService(c.env, user.id);
             const configs = await smtpService.findAll();
-            return respond({ configs });
+            return respond({ content: [{ type: 'text', text: JSON.stringify({ configs }) }], isError: false });
           }
 
           case 'list_templates': {
             const templateService = new TemplateService(c.env, user.id);
             const templates = await templateService.list();
-            return respond({ templates });
+            return respond({ content: [{ type: 'text', text: JSON.stringify({ templates }) }], isError: false });
           }
 
           case 'list_inbox_configs': {
             const inboxService = new InboxService(c.env, user.id);
             const configs = await inboxService.getImapEnabledConfigs();
-            return respond({ configs });
+            return respond({ content: [{ type: 'text', text: JSON.stringify({ configs }) }], isError: false });
           }
 
           default:
-            return respondError(-32601, `Unknown tool: ${toolName}`);
+            return respondError(-32602, `Unknown tool: ${toolName}`);
         }
       } catch (error) {
         console.error('MCP tool error:', error);
-        return respondError(-32603, (error as Error).message || 'Internal error');
+        return respond({ content: [{ type: 'text', text: (error as Error).message || 'Internal error' }], isError: true });
       }
     }
 

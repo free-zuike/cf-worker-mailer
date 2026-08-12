@@ -255,7 +255,9 @@ npx wrangler deploy
 
 ## MCP Server（AI 模型调用）
 
-本服务实现了 **MCP (Model Context Protocol)** 协议，AI 模型（如 Claude、Cursor 等）可以通过 MCP 调用邮件服务。
+本服务实现了 **MCP (Model Context Protocol)** 协议（版本 `2026-07-28`），AI 模型（如 Claude、Cursor 等）可以通过 MCP 调用邮件服务。
+
+采用无状态（stateless）设计：每个请求通过 `_meta` 字段携带协议版本和客户端能力，无需 `initialize` 握手。支持 `server/discover` 进行版本协商。
 
 ### 可用工具
 
@@ -290,6 +292,72 @@ curl -X POST https://zuike.cc.cd/api/api-key/generate \
   }
 }
 ```
+
+### 请求示例
+
+以下示例展示了遵守 `2026-07-28` 协议的请求与响应格式：
+
+**发现服务器能力：**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "server/discover",
+  "params": {}
+}
+```
+
+**列出工具（需携带 `_meta` 协议版本）：**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/list",
+  "params": {
+    "_meta": {
+      "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+      "io.modelcontextprotocol/clientCapabilities": {}
+    }
+  }
+}
+```
+
+**响应格式：**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "resultType": "complete",
+    "tools": [],
+    "_meta": {
+      "io.modelcontextprotocol/serverInfo": {
+        "name": "cf-worker-mailer-mcp",
+        "version": "1.0.0"
+      }
+    }
+  }
+}
+```
+
+**调用工具：**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tools/call",
+  "params": {
+    "name": "list_smtp_configs",
+    "arguments": {},
+    "_meta": {
+      "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+      "io.modelcontextprotocol/clientCapabilities": {}
+    }
+  }
+}
+```
+
+工具执行出错时返回 `isError: true` 的结果（而非 JSON-RPC 错误），便于 AI 模型根据错误信息自我纠正后重试。
 
 ### 变量替换语法
 
