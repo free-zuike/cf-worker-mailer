@@ -547,7 +547,15 @@ mcp.post('/', async (c) => {
     if (typeof declaredVersion !== 'string') throw { code: -32602, message: 'Invalid _meta.io.modelcontextprotocol/protocolVersion' };
     const headerVersion = c.req.header('MCP-Protocol-Version');
     if (headerVersion && headerVersion !== declaredVersion) throw { code: -32020, message: 'MCP-Protocol-Version header mismatch' };
-    if (!SUPPORTED_PROTOCOL_VERSIONS.includes(declaredVersion)) throw { code: -32022, message: `Unsupported protocol version: ${declaredVersion}` };
+    if (!SUPPORTED_PROTOCOL_VERSIONS.includes(declaredVersion)) {
+      // 规范要求 UnsupportedProtocolVersionError 携带 supported/requested
+      const error = Object.assign(new Error(`Unsupported protocol version: ${declaredVersion}`), {
+        code: -32022,
+        message: `Unsupported protocol version: ${declaredVersion}`,
+        data: { supported: SUPPORTED_PROTOCOL_VERSIONS, requested: declaredVersion },
+      });
+      throw error;
+    }
   }
 
   try {
@@ -797,6 +805,9 @@ mcp.post('/', async (c) => {
     if (err.code && err.message) {
       // 协议错误（版本/头部不匹配）按规范返回 HTTP 400
       const status = err.code === -32020 || err.code === -32022 || err.code === -32602 ? 400 : 200;
+      if (err.data !== undefined) {
+        return c.json({ jsonrpc: '2.0', error: { code: err.code, message: err.message, data: err.data }, id }, status);
+      }
       return respondError(err.code, err.message, status);
     }
     return respondError(-32603, (err as Error).message || 'Internal error', 500);
