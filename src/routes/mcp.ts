@@ -280,7 +280,7 @@ async function handleToolCall(toolName: string, args: Record<string, unknown>, u
       });
       // 通知资源列表变更
       Promise.resolve().then(() => {
-        broadcastSSE('notifications/resources/list_changed', '{}', userId);
+        notifyResourcesChanged(userId);
       });
       return { text: `邮件已发送，ID: ${result.id}，状态: ${result.status}`, isError: false };
     }
@@ -336,7 +336,7 @@ async function handleToolCall(toolName: string, args: Record<string, unknown>, u
       const emailService = new EmailService(env, userId);
       await emailService.retryFailedEmail(String(args.emailId));
       Promise.resolve().then(() => {
-        broadcastSSE('notifications/resources/list_changed', '{}', userId);
+        notifyResourcesChanged(userId);
       });
       return { text: `已重试邮件 ${args.emailId}`, isError: false };
     }
@@ -356,35 +356,41 @@ async function handleToolCall(toolName: string, args: Record<string, unknown>, u
 // 搜索 & 补全 (Completions)
 // ============================================================
 
-async function completeArgument(ref: any, argument: { name: string; value: string }, userId: string, env: Env) {
-  // 补全 SMTP 配置名称
-  if (argument.name === 'configId') {
+// 补全目标引用：PromptReference 或 ResourceTemplateReference
+type CompletionRef = { type?: string; name?: string; uri?: string };
+
+async function completeArgument(ref: CompletionRef | undefined, argument: { name: string; value: string }, userId: string, env: Env) {
+  const value = argument.value || '';
+  const isPromptRef = ref?.type === 'ref/prompt';
+
+  // 补全 SMTP 配置 ID（prompt 参数或资源模板参数）
+  if (argument.name === 'configId' || argument.name === 'id') {
     const smtpService = new SmtpService(env, userId);
     const configs = await smtpService.findAll();
     const values = configs
       .map(c => c.id)
-      .filter(id => id.includes(argument.value));
+      .filter(id => id.includes(value));
     return { values: values.slice(0, 20), total: values.length, hasMore: values.length > 20 };
   }
 
-  // 补全模板名称
-  if (argument.name === 'templateId') {
+  // 补全邮件模板名称（仅 prompt 引用）
+  if (argument.name === 'templateId' && isPromptRef) {
     const templateService = new TemplateService(env, userId);
     const templates = await templateService.list();
     const values = templates
       .map(t => t.id)
-      .filter(id => id.includes(argument.value));
+      .filter(id => id.includes(value));
     return { values: values.slice(0, 20), total: values.length, hasMore: values.length > 20 };
   }
 
-  // 补全文件夹名称
-  if (argument.name === 'folder') {
+  // 补全文件夹名称（prompt 参数）
+  if (argument.name === 'folder' && isPromptRef) {
     const folders = ['INBOX', 'SENT', 'DRAFTS', 'TRASH', 'SPAM', 'ARCHIVE'];
-    const values = folders.filter(f => f.toLowerCase().includes(argument.value.toLowerCase()));
+    const values = folders.filter(f => f.toLowerCase().includes(value.toLowerCase()));
     return { values: values.slice(0, 20), total: values.length };
   }
 
-  // 补全 prompt 参数
+  // 补全 prompt 查询关键词：无预置建议
   if (argument.name === 'query') {
     return { values: [] };
   }
@@ -423,11 +429,12 @@ async function buildConfigElicitation(userId: string, env: Env) {
 }
 
 // 从重试请求的 inputResponses 中提取提交的表单数据
-function extractInputResponses(inputResponses: any): Record<string, unknown> {
+type ElicitResponse = { action?: string; content?: Record<string, unknown> };
+function extractInputResponses(inputResponses: unknown): Record<string, unknown> {
   const merged: Record<string, unknown> = {};
   if (!inputResponses || typeof inputResponses !== 'object') return merged;
-  for (const value of Object.values(inputResponses) as any[]) {
-    const resp = value as { action?: string; content?: Record<string, unknown> };
+  for (const value of Object.values(inputResponses as Record<string, unknown>)) {
+    const resp = value as ElicitResponse;
     if (resp.action === 'accept' && resp.content && typeof resp.content === 'object') {
       Object.assign(merged, resp.content);
     }
@@ -447,8 +454,9 @@ interface SSEClient {
 
 const sseClients = new Map<string, SSEClient>();
 
-function broadcastSSE(event: string, data: string, userId?: string) {
-  const msg = `event: ${event}\ndata: ${data}\n\n`;
+// 发送 SSE 通知：data 必须是完整的 JSON-RPC 通知消息（客户端按 JSON-RPC 解析）
+function broadcastSSE(event: string, json: unknown, userId?: string) {
+  const msg = `event: ${event}\ndata: ${JSON.stringify(json)}\n\n`;
   const encoded = new TextEncoder().encode(msg);
   for (const [id, client] of sseClients) {
     if (userId && client.userId !== userId) continue;
@@ -456,15 +464,13 @@ function broadcastSSE(event: string, data: string, userId?: string) {
   }
 }
 
-// 资源/工具列表变更时通知订阅者
-function notifyListChanged(userId: string) {
+// 触发资源列表变更通知（发送邮件/重试后调用）
+function notifyResourcesChanged(userId: string) {
+  const notification = { jsonrpc: '2.0', method: 'notifications/resources/list_changed' };
   for (const [id, client] of sseClients) {
     if (client.userId !== userId) continue;
     if (client.filter.resourcesListChanged) {
-      broadcastSSE('notifications/resources/list_changed', '{}', userId);
-    }
-    if (client.filter.toolsListChanged) {
-      broadcastSSE('notifications/tools/list_changed', '{}', userId);
+      broadcastSSE('message', notification, userId);
     }
   }
 }
@@ -532,17 +538,17 @@ mcp.post('/', async (c) => {
     id,
   });
 
-  const respondError = (code: number, message: string) => c.json({ jsonrpc: '2.0', error: { code, message }, id });
+  const respondError = (code: number, message: string, status: 200 | 400 | 500 = 200) => c.json({ jsonrpc: '2.0', error: { code, message }, id }, status);
 
-  // 验证协议版本（新协议客户端）
+  // 验证协议版本（新协议客户端）。旧协议客户端（无 _meta）跳过。
+  // 握手/通知/discover 类方法不需要前置版本协商，在调用处跳过。
   function validateVersion() {
     const declaredVersion = meta['io.modelcontextprotocol/protocolVersion'];
-    if (declaredVersion === undefined) return true; // 旧协议，跳过
-    if (typeof declaredVersion !== 'string') return false;
+    if (declaredVersion === undefined) return; // 旧协议，跳过
+    if (typeof declaredVersion !== 'string') throw { code: -32602, message: 'Invalid _meta.io.modelcontextprotocol/protocolVersion' };
     const headerVersion = c.req.header('MCP-Protocol-Version');
     if (headerVersion && headerVersion !== declaredVersion) throw { code: -32020, message: 'MCP-Protocol-Version header mismatch' };
     if (!SUPPORTED_PROTOCOL_VERSIONS.includes(declaredVersion)) throw { code: -32022, message: `Unsupported protocol version: ${declaredVersion}` };
-    return true;
   }
 
   try {
@@ -563,7 +569,8 @@ mcp.post('/', async (c) => {
       }
 
       case 'notifications/initialized':
-        return c.json({ jsonrpc: '2.0', result: null, id });
+        // 通知无需响应体，HTTP 202 表示已接收
+        return c.body(null, 202);
 
       case 'server/discover':
         return respond({
@@ -575,15 +582,17 @@ mcp.post('/', async (c) => {
         });
 
       case 'ping':
+        validateVersion();
         return respond({});
 
       case 'notifications/cancelled':
-        // 取消请求通知，无需响应
-        return c.json({ jsonrpc: '2.0', result: null, id });
+        // 取消请求通知，无需响应体
+        return c.body(null, 202);
 
       // ========== 工具 (Tools) ==========
 
       case 'tools/list':
+        validateVersion();
         return respond({ tools: TOOLS, ttlMs: 300000, cacheScope: 'public' as const });
 
       case 'tools/call': {
@@ -706,7 +715,9 @@ mcp.post('/', async (c) => {
       case 'completion/complete': {
         validateVersion();
         if (!user) return respondError(401, 'Unauthorized');
-        const result = await completeArgument(params?.ref, params?.argument, user.id, c.env);
+        const arg = params?.argument;
+        if (!arg || !arg.name) return respondError(-32602, 'Missing required parameter: argument.name');
+        const result = await completeArgument(params?.ref, arg, user.id, c.env);
         return respond({ completion: result });
       }
 
@@ -715,15 +726,26 @@ mcp.post('/', async (c) => {
       case 'subscriptions/listen': {
         validateVersion();
         const notifications = params?.notifications || {};
-        // 在 POST 上下文中，subscriptions/listen 确认订阅请求。
-        // 实际通知流通过 GET SSE 端点传递。
-        // 订阅过滤器会记录在 sseClients 中（由客户端通过 endpoint 事件关联）。
-        const ackFilter: any = {};
-        if (notifications.toolsListChanged) ackFilter.toolsListChanged = true;
-        if (notifications.promptsListChanged) ackFilter.promptsListChanged = true;
-        if (notifications.resourcesListChanged) ackFilter.resourcesListChanged = true;
-        // 更新该用户的所有活跃 SSE 连接的过滤器
-        // 在简化实现中，所有连接都接收订阅的通知
+        // 2026-07-28: subscriptions/listen 在长连接上开启通知流。
+        // 本服务实际通知流走 GET SSE 端点；此处将订阅过滤器应用到
+        // 该用户的所有活跃 SSE 连接。
+        const newFilter = {
+          toolsListChanged: !!notifications.toolsListChanged,
+          promptsListChanged: !!notifications.promptsListChanged,
+          resourcesListChanged: !!notifications.resourcesListChanged,
+        };
+        for (const client of sseClients.values()) {
+          if (user && client.userId === user.id) {
+            client.filter = newFilter;
+          }
+        }
+        // 按规范向订阅者广播 acknowledged 通知（确认已订阅的通知类型）
+        const ack: { jsonrpc: string; method: string; params: { notifications: typeof newFilter } } = {
+          jsonrpc: '2.0',
+          method: 'notifications/subscriptions/acknowledged',
+          params: { notifications: newFilter },
+        };
+        broadcastSSE('message', ack, user?.id);
         return respond({});
       }
 
@@ -737,9 +759,11 @@ mcp.post('/', async (c) => {
     }
   } catch (err: any) {
     if (err.code && err.message) {
-      return respondError(err.code, err.message);
+      // 协议错误（版本/头部不匹配）按规范返回 HTTP 400
+      const status = err.code === -32020 || err.code === -32022 || err.code === -32602 ? 400 : 200;
+      return respondError(err.code, err.message, status);
     }
-    return respondError(-32603, (err as Error).message || 'Internal error');
+    return respondError(-32603, (err as Error).message || 'Internal error', 500);
   }
 });
 
