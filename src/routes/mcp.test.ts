@@ -95,9 +95,10 @@ describe('MCP 基础协议', () => {
 
 describe('MCP 版本验证', () => {
   const tools = { jsonrpc: '2.0', id: 1, method: 'tools/list', params: { _meta: { 'io.modelcontextprotocol/protocolVersion': '2026-07-28' } } };
+  const MODERN_HDR = { 'MCP-Protocol-Version': '2026-07-28', 'Mcp-Method': 'tools/list' };
 
   it('新协议正确版本放行', async () => {
-    const { status } = await postJson(tools);
+    const { status } = await postJson(tools, MODERN_HDR);
     expect(status).toBe(200);
   });
 

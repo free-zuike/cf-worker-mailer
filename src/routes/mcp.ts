@@ -539,14 +539,38 @@ mcp.post('/', async (c) => {
 
   const respondError = (code: number, message: string, status: 200 | 400 | 500 = 200) => c.json({ jsonrpc: '2.0', error: { code, message }, id }, status);
 
+  // 2026-07-28 协议：MCP-Protocol-Version、Mcp-Method、Mcp-Name 为 REQUIRED 头
+  // 旧版协议（2025-11-25 及更早）：缺失时放行，存在时校验一致性
+  const declaredVersion = meta['io.modelcontextprotocol/protocolVersion'];
+  const isModern = declaredVersion === '2026-07-28';
+  const headerVersion = c.req.header('MCP-Protocol-Version');
+  const headerMethod = c.req.header('Mcp-Method');
+  const headerName = c.req.header('Mcp-Name');
+
+  if (isModern && !headerVersion) {
+    return c.json({ jsonrpc: '2.0', error: { code: -32020, message: '缺少 MCP-Protocol-Version 请求头（2026-07-28 协议必需）' }, id }, 400);
+  }
+  if (headerVersion && headerVersion !== declaredVersion) {
+    return c.json({ jsonrpc: '2.0', error: { code: -32020, message: `MCP-Protocol-Version header '${headerVersion}' mismatch body value '${declaredVersion}'` }, id }, 400);
+  }
+  if (isModern && !headerMethod) {
+    return c.json({ jsonrpc: '2.0', error: { code: -32020, message: '缺少 Mcp-Method 请求头（2026-07-28 协议必需）' }, id }, 400);
+  }
+  if (headerMethod && headerMethod !== method) {
+    return c.json({ jsonrpc: '2.0', error: { code: -32020, message: `Mcp-Method header '${headerMethod}' mismatch body method '${method}'` }, id }, 400);
+  }
+  if (isModern && method === 'tools/call' && !headerName) {
+    return c.json({ jsonrpc: '2.0', error: { code: -32020, message: '缺少 Mcp-Name 请求头（tools/call 必需）' }, id }, 400);
+  }
+  if (headerName && (params?.name ?? params?.uri) && headerName !== (params?.name ?? params?.uri)) {
+    return c.json({ jsonrpc: '2.0', error: { code: -32020, message: `Mcp-Name header '${headerName}' mismatch body value '${params?.name ?? params?.uri}'` }, id }, 400);
+  }
+
   // 验证协议版本（新协议客户端）。旧协议客户端（无 _meta）跳过。
   // 握手/通知/discover 类方法不需要前置版本协商，在调用处跳过。
   function validateVersion() {
-    const declaredVersion = meta['io.modelcontextprotocol/protocolVersion'];
     if (declaredVersion === undefined) return; // 旧协议，跳过
     if (typeof declaredVersion !== 'string') throw { code: -32602, message: 'Invalid _meta.io.modelcontextprotocol/protocolVersion' };
-    const headerVersion = c.req.header('MCP-Protocol-Version');
-    if (headerVersion && headerVersion !== declaredVersion) throw { code: -32020, message: 'MCP-Protocol-Version header mismatch' };
     if (!SUPPORTED_PROTOCOL_VERSIONS.includes(declaredVersion)) {
       // 规范要求 UnsupportedProtocolVersionError 携带 supported/requested
       const error = Object.assign(new Error(`Unsupported protocol version: ${declaredVersion}`), {
