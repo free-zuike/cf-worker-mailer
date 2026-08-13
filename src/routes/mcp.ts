@@ -256,12 +256,19 @@ const PROMPTS = [
 // 工具调用处理
 // ============================================================
 
-async function handleToolCall(toolName: string, args: Record<string, unknown>, userId: string, env: Env) {
+// 工具调用结果：needElicitConfig 表示缺发件配置，可触发 elicitation 交互
+interface ToolResult {
+  text: string;
+  isError: boolean;
+  needElicitConfig?: boolean;
+}
+
+async function handleToolCall(toolName: string, args: Record<string, unknown>, userId: string, env: Env): Promise<ToolResult | null> {
   switch (toolName) {
     case 'send_email': {
       const toArr = String(args.to || '').split(',').map(s => s.trim()).filter(Boolean);
       if (!toArr.length) return { isError: true, text: '收件人不能为空' };
-      if (!args.configId) return { isError: true, text: '缺少 configId，请先调用 list_smtp_configs 获取发件配置 ID' };
+      if (!args.configId) return { isError: true, text: '缺少 configId，请选择发件配置', needElicitConfig: true };
       const emailService = new EmailService(env, userId);
       const result = await emailService.sendEmail({
         to: toArr,
@@ -279,14 +286,14 @@ async function handleToolCall(toolName: string, args: Record<string, unknown>, u
     }
 
     case 'list_inbox': {
-      if (!args.configId) return { isError: true, text: '缺少 configId，请先调用 list_inbox_configs 获取配置 ID' };
+      if (!args.configId) return { isError: true, text: '缺少 configId，请选择发件配置', needElicitConfig: true };
       const svc = new InboxService(env, userId);
       const result = await svc.listEmails(String(args.configId), String(args.folder || 'INBOX'), Number(args.page || 1), 20);
       return { text: JSON.stringify(result), isError: false };
     }
 
     case 'search_emails': {
-      if (!args.configId) return { isError: true, text: '缺少 configId' };
+      if (!args.configId) return { isError: true, text: '缺少 configId，请选择发件配置', needElicitConfig: true };
       if (!args.q) return { isError: true, text: '缺少搜索关键词 q' };
       const svc = new InboxService(env, userId);
       const result = await svc.searchEmails(String(args.configId), String(args.q));
@@ -383,6 +390,49 @@ async function completeArgument(ref: any, argument: { name: string; value: strin
   }
 
   return { values: [], total: 0 };
+}
+
+// ============================================================
+// Elicitation（向用户追问信息，MRTR 模式）
+// ============================================================
+
+// 构造发件配置选择表单（elicitation/create 请求）
+async function buildConfigElicitation(userId: string, env: Env) {
+  const smtpService = new SmtpService(env, userId);
+  const configs = await smtpService.findAll();
+  if (!configs.length) return null;
+  return {
+    method: 'elicitation/create',
+    params: {
+      mode: 'form' as const,
+      message: '需要选择一个发件配置来继续，请选择：',
+      requestedSchema: {
+        type: 'object' as const,
+        properties: {
+          configId: {
+            type: 'string' as const,
+            title: '发件配置',
+            description: '选择用于发送邮件的发件配置',
+            oneOf: configs.map(c => ({ const: c.id, title: `${c.name} <${c.fromEmail}>` })),
+          },
+        },
+        required: ['configId'],
+      },
+    },
+  };
+}
+
+// 从重试请求的 inputResponses 中提取提交的表单数据
+function extractInputResponses(inputResponses: any): Record<string, unknown> {
+  const merged: Record<string, unknown> = {};
+  if (!inputResponses || typeof inputResponses !== 'object') return merged;
+  for (const value of Object.values(inputResponses) as any[]) {
+    const resp = value as { action?: string; content?: Record<string, unknown> };
+    if (resp.action === 'accept' && resp.content && typeof resp.content === 'object') {
+      Object.assign(merged, resp.content);
+    }
+  }
+  return merged;
 }
 
 // ============================================================
@@ -540,9 +590,42 @@ mcp.post('/', async (c) => {
         validateVersion();
         if (!user) return respondError(401, 'Unauthorized: 请提供有效的 API Key');
         const toolName = params?.name;
-        const args = params?.arguments || {};
+
+        // MRTR 重试：合并 inputResponses 中用户提交的表单数据到参数
+        const elicitationData = extractInputResponses(params?.inputResponses);
+        const args = { ...(params?.arguments || {}), ...elicitationData };
+
         const result = await handleToolCall(toolName, args, user.id, c.env);
         if (result === null) return respondError(-32602, `Unknown tool: ${toolName}`);
+
+        // 需要用户在表单中选择发件配置（Elicitation）
+        if (result.needElicitConfig) {
+          // 仅当客户端声明支持 elicitation.form 时才发起交互
+          const clientCaps = meta['io.modelcontextprotocol/clientCapabilities'] || {};
+          if (clientCaps.elicitation?.form) {
+            const elicit = await buildConfigElicitation(user.id, c.env);
+            if (elicit) {
+              // requestState 携带原始参数，供重试时恢复上下文
+              const requestState = JSON.stringify({
+                toolName,
+                arguments: params?.arguments || {},
+              });
+              return c.json({
+                jsonrpc: '2.0',
+                result: {
+                  resultType: 'input_required',
+                  inputRequests: {
+                    config_selection: elicit,
+                  },
+                  requestState,
+                  _meta: { 'io.modelcontextprotocol/serverInfo': SERVER_INFO },
+                },
+                id,
+              });
+            }
+          }
+        }
+
         return respond({ content: [{ type: 'text', text: result.text }], isError: result.isError });
       }
 

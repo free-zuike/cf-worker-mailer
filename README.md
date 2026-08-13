@@ -273,6 +273,7 @@ npx wrangler deploy
 | **Resources**（资源） | ✅ `resources/list` + `resources/templates/list` + `resources/read` |
 | **Prompts**（提示） | ✅ `prompts/list` + `prompts/get`，3 个邮件提示模板 |
 | **Completions**（补全） | ✅ `completion/complete`，参数自动补全 |
+| **Elicitation**（用户追问） | ✅ MRTR 模式：缺发件配置时返回表单让用户选择 |
 | **Ping** | ✅ 心跳检测 |
 | **Subscriptions**（订阅） | ✅ `subscriptions/listen` + SSE 流 (GET /) |
 | **Notifications** | ✅ 资源/工具列表变更通知推送 |
@@ -406,6 +407,60 @@ curl -X POST https://zuike.cc.cd/api/api-key/generate \
 ```
 
 工具执行出错时返回 `isError: true` 的结果（而非 JSON-RPC 错误），便于 AI 模型根据错误信息自我纠正后重试。
+
+### Elicitation（向用户追问）
+
+当调用 `send_email` / `list_inbox` / `search_emails` 未提供 `configId` 且客户端支持 `elicitation.form` 时，服务器会返回 `input_required` 结果，弹出发件配置选择表单（MRTR 多轮往返）：
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "result": {
+    "resultType": "input_required",
+    "inputRequests": {
+      "config_selection": {
+        "method": "elicitation/create",
+        "params": {
+          "mode": "form",
+          "message": "需要选择一个发件配置来继续，请选择：",
+          "requestedSchema": {
+            "type": "object",
+            "properties": {
+              "configId": {
+                "type": "string",
+                "oneOf": [{ "const": "config-id-1", "title": "配置1 <a@b.com>" }]
+              }
+            },
+            "required": ["configId"]
+          }
+        }
+      }
+    },
+    "requestState": "{...}"
+  }
+}
+```
+
+客户端重试时携带 `inputResponses` 提交用户选择：
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "method": "tools/call",
+  "params": {
+    "name": "send_email",
+    "arguments": { "to": "...", "subject": "..." },
+    "inputResponses": {
+      "config_selection": {
+        "action": "accept",
+        "content": { "configId": "config-id-1" }
+      }
+    }
+  }
+}
+```
 
 ### 变量替换语法
 
