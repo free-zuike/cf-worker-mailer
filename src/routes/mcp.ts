@@ -358,9 +358,11 @@ type CompletionRef = { type?: string; name?: string; uri?: string };
 async function completeArgument(ref: CompletionRef | undefined, argument: { name: string; value: string }, userId: string, env: Env) {
   const value = argument.value || '';
   const isPromptRef = ref?.type === 'ref/prompt';
+  // 资源模板引用按 URI 区分补全目标
+  const refUri = ref?.type === 'ref/resource' ? ref.uri : undefined;
 
-  // 补全 SMTP 配置 ID（prompt 参数或资源模板参数）
-  if (argument.name === 'configId' || argument.name === 'id') {
+  // 补全 SMTP 配置 ID（搜索 prompt 的 configId 参数，或 mailer://smtp/{id} 资源）
+  if ((argument.name === 'configId' && isPromptRef) || (argument.name === 'id' && refUri?.includes('/smtp/'))) {
     const smtpService = new SmtpService(env, userId);
     const configs = await smtpService.findAll();
     const values = configs
@@ -369,8 +371,8 @@ async function completeArgument(ref: CompletionRef | undefined, argument: { name
     return { values: values.slice(0, 20), total: values.length, hasMore: values.length > 20 };
   }
 
-  // 补全邮件模板名称（仅 prompt 引用）
-  if (argument.name === 'templateId' && isPromptRef) {
+  // 补全邮件模板 ID（mailer://template/{id} 资源）
+  if (argument.name === 'id' && refUri?.includes('/template/')) {
     const templateService = new TemplateService(env, userId);
     const templates = await templateService.list();
     const values = templates
@@ -379,16 +381,14 @@ async function completeArgument(ref: CompletionRef | undefined, argument: { name
     return { values: values.slice(0, 20), total: values.length, hasMore: values.length > 20 };
   }
 
-  // 补全文件夹名称（prompt 参数）
-  if (argument.name === 'folder' && isPromptRef) {
-    const folders = ['INBOX', 'SENT', 'DRAFTS', 'TRASH', 'SPAM', 'ARCHIVE'];
-    const values = folders.filter(f => f.toLowerCase().includes(value.toLowerCase()));
-    return { values: values.slice(0, 20), total: values.length };
-  }
-
-  // 补全 prompt 查询关键词：无预置建议
-  if (argument.name === 'query') {
-    return { values: [] };
+  // 补全邮件历史 ID（mailer://email/{id} 资源）
+  if (argument.name === 'id' && refUri?.includes('/email/')) {
+    const emailService = new EmailService(env, userId);
+    const history = await emailService.listHistory(100, 0);
+    const values = history
+      .map(e => e.id)
+      .filter(id => id.includes(value));
+    return { values: values.slice(0, 20), total: values.length, hasMore: values.length > 20 };
   }
 
   return { values: [], total: 0 };
@@ -401,7 +401,7 @@ async function completeArgument(ref: CompletionRef | undefined, argument: { name
 // 构造发件配置选择表单（elicitation/create 请求）
 async function buildConfigElicitation(userId: string, env: Env) {
   const smtpService = new SmtpService(env, userId);
-  const configs = await smtpService.findAll();
+  const configs = (await smtpService.findAll()).filter(c => c.enabled);
   if (!configs.length) return null;
   return {
     method: 'elicitation/create',
@@ -499,6 +499,9 @@ mcp.get('/', async (c) => {
   const user = await getUserByApiKey(c.env, apiKey);
 
   sseClients.set(id, { writer, userId: user?.id ?? null, filter: {} });
+
+  // 初始注释行：确认流已建立（SDK 客户端等待首条消息，避免连接超时）
+  await writer.write(new TextEncoder().encode(': connected\n\n')).catch(() => sseClients.delete(id));
 
   // 移除客户端断开连接时的引用
   c.req.raw.signal.addEventListener('abort', () => {
@@ -756,6 +759,8 @@ mcp.post('/', async (c) => {
 
       case 'subscriptions/listen': {
         validateVersion();
+        // 订阅需认证：通知按 userId 定向推送，匿名连接无法收到任何通知
+        if (!user) return respondError(401, 'Unauthorized: 请提供有效的 API Key');
         const notifications = params?.notifications || {};
         // 2026-07-28: subscriptions/listen 在长连接上开启通知流。
         // 本服务实际通知流走 GET SSE 端点；此处将订阅过滤器应用到
@@ -766,7 +771,7 @@ mcp.post('/', async (c) => {
           resourcesListChanged: !!notifications.resourcesListChanged,
         };
         for (const client of sseClients.values()) {
-          if (user && client.userId === user.id) {
+          if (client.userId === user.id) {
             client.filter = newFilter;
           }
         }
@@ -776,7 +781,7 @@ mcp.post('/', async (c) => {
           method: 'notifications/subscriptions/acknowledged',
           params: { notifications: newFilter },
         };
-        broadcastSSE('message', ack, user?.id);
+        broadcastSSE('message', ack, user.id);
         return respond({});
       }
 
