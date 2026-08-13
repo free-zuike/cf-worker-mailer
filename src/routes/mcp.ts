@@ -256,11 +256,13 @@ const PROMPTS = [
 // 工具调用处理
 // ============================================================
 
-// 工具调用结果：needElicitConfig 表示缺发件配置，可触发 elicitation 交互
+// 工具调用结果：needElicitConfig 表示缺发件配置，可触发 elicitation 交互；
+// notifyChanged 表示数据已变更，应通知订阅者
 interface ToolResult {
   text: string;
   isError: boolean;
   needElicitConfig?: boolean;
+  notifyChanged?: boolean;
 }
 
 async function handleToolCall(toolName: string, args: Record<string, unknown>, userId: string, env: Env): Promise<ToolResult | null> {
@@ -278,11 +280,7 @@ async function handleToolCall(toolName: string, args: Record<string, unknown>, u
         configId: String(args.configId),
         cc: args.cc ? String(args.cc).split(',').map((s: string) => s.trim()).filter(Boolean) : undefined,
       });
-      // 通知资源列表变更
-      Promise.resolve().then(() => {
-        notifyResourcesChanged(userId);
-      });
-      return { text: `邮件已发送，ID: ${result.id}，状态: ${result.status}`, isError: false };
+      return { text: `邮件已发送，ID: ${result.id}，状态: ${result.status}`, isError: false, notifyChanged: true };
     }
 
     case 'list_inbox': {
@@ -301,9 +299,10 @@ async function handleToolCall(toolName: string, args: Record<string, unknown>, u
     }
 
     case 'get_email': {
+      if (!args.emailId) return { isError: true, text: '缺少 emailId' };
       const inboxService = new InboxService(env, userId);
-      const email = await inboxService.getEmail(String(args.emailId || ''));
-      if (!email) return { isError: true, text: '邮件不存在' };
+      const email = await inboxService.getEmail(String(args.emailId));
+      if (!email) return { isError: true, text: `邮件不存在: ${args.emailId}` };
       return { text: JSON.stringify({ email }), isError: false };
     }
 
@@ -335,10 +334,7 @@ async function handleToolCall(toolName: string, args: Record<string, unknown>, u
       if (!args.emailId) return { isError: true, text: '缺少 emailId' };
       const emailService = new EmailService(env, userId);
       await emailService.retryFailedEmail(String(args.emailId));
-      Promise.resolve().then(() => {
-        notifyResourcesChanged(userId);
-      });
-      return { text: `已重试邮件 ${args.emailId}`, isError: false };
+      return { text: `已重试邮件 ${args.emailId}`, isError: false, notifyChanged: true };
     }
 
     case 'get_metrics': {
@@ -428,18 +424,22 @@ async function buildConfigElicitation(userId: string, env: Env) {
   };
 }
 
-// 从重试请求的 inputResponses 中提取提交的表单数据
+// 从重试请求的 inputResponses 中提取提交的表单数据。
+// 返回 { data: 已接受的表单数据, denied: 用户拒绝了请求 }
 type ElicitResponse = { action?: string; content?: Record<string, unknown> };
-function extractInputResponses(inputResponses: unknown): Record<string, unknown> {
-  const merged: Record<string, unknown> = {};
-  if (!inputResponses || typeof inputResponses !== 'object') return merged;
+function extractInputResponses(inputResponses: unknown): { data: Record<string, unknown>; denied: boolean } {
+  const data: Record<string, unknown> = {};
+  let denied = false;
+  if (!inputResponses || typeof inputResponses !== 'object') return { data, denied };
   for (const value of Object.values(inputResponses as Record<string, unknown>)) {
     const resp = value as ElicitResponse;
     if (resp.action === 'accept' && resp.content && typeof resp.content === 'object') {
-      Object.assign(merged, resp.content);
+      Object.assign(data, resp.content);
+    } else if (resp.action === 'decline' || resp.action === 'cancel') {
+      denied = true;
     }
   }
-  return merged;
+  return { data, denied };
 }
 
 // ============================================================
@@ -467,7 +467,7 @@ function broadcastSSE(event: string, json: unknown, userId?: string) {
 // 触发资源列表变更通知（发送邮件/重试后调用）
 function notifyResourcesChanged(userId: string) {
   const notification = { jsonrpc: '2.0', method: 'notifications/resources/list_changed' };
-  for (const [id, client] of sseClients) {
+  for (const client of sseClients.values()) {
     if (client.userId !== userId) continue;
     if (client.filter.resourcesListChanged) {
       broadcastSSE('message', notification, userId);
@@ -497,10 +497,6 @@ mcp.get('/', async (c) => {
   const authHeader = c.req.header('Authorization') || '';
   const apiKey = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
   const user = await getUserByApiKey(c.env, apiKey);
-
-  // 发送初始端点
-  const endpointMsg = `event: endpoint\ndata: /\n\n`;
-  await writer.write(new TextEncoder().encode(endpointMsg));
 
   sseClients.set(id, { writer, userId: user?.id ?? null, filter: {} });
 
@@ -600,24 +596,59 @@ mcp.post('/', async (c) => {
         if (!user) return respondError(401, 'Unauthorized: 请提供有效的 API Key');
         const toolName = params?.name;
 
-        // MRTR 重试：合并 inputResponses 中用户提交的表单数据到参数
-        const elicitationData = extractInputResponses(params?.inputResponses);
+        // MRTR 重试：校验 requestState（防跨工具重放）
+        let alreadyElicited = false;
+        const requestState = params?.requestState;
+        if (requestState !== undefined) {
+          try {
+            const parsed = JSON.parse(requestState);
+            if (parsed?.toolName && parsed.toolName !== toolName) {
+              return respond({ content: [{ type: 'text', text: 'requestState 与请求不匹配' }], isError: true });
+            }
+            alreadyElicited = parsed?.alreadyElicited === true;
+          } catch {
+            return respond({ content: [{ type: 'text', text: '无效的 requestState' }], isError: true });
+          }
+        }
+
+        // 合并 inputResponses 中用户提交的表单数据
+        const { data: elicitationData, denied } = extractInputResponses(params?.inputResponses);
+        if (denied) {
+          return respond({ content: [{ type: 'text', text: '用户拒绝了操作' }], isError: true });
+        }
         const args = { ...(params?.arguments || {}), ...elicitationData };
 
-        const result = await handleToolCall(toolName, args, user.id, c.env);
+        // 工具执行错误（SMTP 失败等业务异常）按规范返回 isError: true，
+        // 让 LLM 能看到错误信息并自我纠正；不能抛成 -32603 协议错误
+        let result: ToolResult | null;
+        try {
+          result = await handleToolCall(toolName, args, user.id, c.env);
+        } catch (error) {
+          result = { text: (error as Error).message || '工具执行失败', isError: true };
+        }
         if (result === null) return respondError(-32602, `Unknown tool: ${toolName}`);
+
+        // 数据已变更，用 waitUntil 通知订阅者（确保在响应返回后仍执行）
+        if (result.notifyChanged) {
+          c.executionCtx.waitUntil(Promise.resolve().then(() => notifyResourcesChanged(user.id)));
+        }
 
         // 需要用户在表单中选择发件配置（Elicitation）
         if (result.needElicitConfig) {
+          // 已是 elicitation 重试但参数仍缺失：不再追问，返回最终错误避免无限循环
+          if (alreadyElicited) {
+            return respond({ content: [{ type: 'text', text: '缺少 configId，请先调用 list_smtp_configs 获取发件配置' }], isError: true });
+          }
           // 仅当客户端声明支持 elicitation.form 时才发起交互
           const clientCaps = meta['io.modelcontextprotocol/clientCapabilities'] || {};
           if (clientCaps.elicitation?.form) {
             const elicit = await buildConfigElicitation(user.id, c.env);
             if (elicit) {
-              // requestState 携带原始参数，供重试时恢复上下文
-              const requestState = JSON.stringify({
+              // requestState 携带原始参数和已追问标记，供重试时恢复上下文
+              const newState = JSON.stringify({
                 toolName,
                 arguments: params?.arguments || {},
+                alreadyElicited: true,
               });
               return c.json({
                 jsonrpc: '2.0',
@@ -626,7 +657,7 @@ mcp.post('/', async (c) => {
                   inputRequests: {
                     config_selection: elicit,
                   },
-                  requestState,
+                  requestState: newState,
                   _meta: { 'io.modelcontextprotocol/serverInfo': SERVER_INFO },
                 },
                 id,
