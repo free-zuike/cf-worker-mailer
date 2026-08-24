@@ -15,7 +15,7 @@
 
 ### 邮件发送
 - 用户注册/登录（邮箱+密码、GitHub OAuth）
-- SMTP 配置管理（支持 SMTP 和 MailChannels）
+- SMTP 配置管理
 - 发件配置集成 IMAP 收件设置（同一账号密码）
 - 邮件模板管理（支持变量替换）
 - 富文本编辑器（wangEditor，支持图片上传到 R2）

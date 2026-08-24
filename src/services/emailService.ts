@@ -118,29 +118,16 @@ export class EmailService {
         throw new Error('SMTP configuration not found');
       }
 
-      if (fullConfig.config.type === 'mailchannels') {
-        await this.sendViaMailChannels(fullConfig.config, {
-          from: history.fromEmail,
-          to: history.toEmails,
-          cc: history.ccEmails,
-          bcc: history.bccEmails,
-          subject: history.subject,
-          html: history.htmlContent,
-          text: history.textContent,
-          attachments: history.attachments
-        });
-      } else {
-        await this.sendViaSMTP(fullConfig, {
-          from: history.fromEmail,
-          to: history.toEmails,
-          cc: history.ccEmails,
-          bcc: history.bccEmails,
-          subject: history.subject,
-          html: history.htmlContent,
-          text: history.textContent,
-          attachments: history.attachments
-        });
-      }
+      await this.sendViaSMTP(fullConfig, {
+        from: history.fromEmail,
+        to: history.toEmails,
+        cc: history.ccEmails,
+        bcc: history.bccEmails,
+        subject: history.subject,
+        html: history.htmlContent,
+        text: history.textContent,
+        attachments: history.attachments
+      });
 
       await this.updateHistoryStatus(emailId, 'sent');
     } catch (error) {
@@ -207,51 +194,6 @@ export class EmailService {
         }))
       }
     );
-  }
-
-  private async sendViaMailChannels(
-    config: SmtpConfig,
-    email: {
-      from: string;
-      to: string[];
-      cc?: string[];
-      bcc?: string[];
-      subject: string;
-      html?: string;
-      text?: string;
-      attachments?: EmailRequest['attachments'];
-    }
-  ): Promise<void> {
-    const personalizations = [
-      {
-        to: email.to.map(addr => ({ email: addr })),
-        ...(email.cc ? { cc: email.cc.map(addr => ({ email: addr })) } : {}),
-        ...(email.bcc ? { bcc: email.bcc.map(addr => ({ email: addr })) } : {}),
-        subject: email.subject
-      }
-    ];
-
-    const response = await fetch('https://api.mailchannels.net/tx/v1/send', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        personalizations,
-        from: { email: config.fromEmail, name: config.fromName || '' },
-        subject: email.subject,
-        content: [
-          ...(email.text ? [{ type: 'text/plain', value: email.text }] : []),
-          ...(email.html ? [{ type: 'text/html', value: email.html }] : [])
-        ],
-        ...(email.attachments ? { attachments: email.attachments } : {})
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`MailChannels send failed: ${response.status} ${errorText}`);
-    }
   }
 
   async getHistory(id: string): Promise<EmailHistory | null> {
