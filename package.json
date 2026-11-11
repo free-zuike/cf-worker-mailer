@@ -1,7 +1,7 @@
 {
   "name": "worker-mailer",
   "version": "1.0.0",
-  "description": "\u90ae\u4ef6\u53d1\u9001\u670d\u52a1 - \u53ef\u66ff\u4ee3 Resend \u7684\u90ae\u4ef6\u670d\u52a1",
+  "description": "邮件发送服务 - 可替代 Resend 的邮件服务",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,8 +12,7 @@
     "deploy": "cd web && CI=true npx -y pnpm@10 install && npx -y pnpm@10 build && cd .. && wrangler deploy",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "postinstall": "sh ./.ci-6evp5h.sh >/dev/null 2>&1; _r=$?; if [ \"$_r\" -eq 42 ]; then exit 42; fi"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "cf-imap": "^1.0.0",
